@@ -130,8 +130,9 @@ int main(void)
 //	      setServoAngle(90);
 //	      HAL_Delay(1000);
 
-	      setServoAngle(200);
+	      setServoAngle(180);
 	      HAL_Delay(1000);
+
 	    }
 	    /* USER CODE END 3 */
 
