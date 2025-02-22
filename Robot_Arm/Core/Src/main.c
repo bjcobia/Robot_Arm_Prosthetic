@@ -32,6 +32,11 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+// Define common angle constants for clarity and easy modification
+#define FULL_ROTATION 360     // Full rotation in degrees
+#define HALF_ROTATION 180     // Half rotation in degrees
+#define QUARTER_ROTATION 90   // Quarter rotation in degrees
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -43,10 +48,18 @@
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim4;
+TIM_HandleTypeDef htim8;
 
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+
+int currentPos1 = 0;
+int currentPos2 = 0;
+int currentPos3 = 0;
+int currentPos4 = 0;
+int currentPos5 = 0;
 
 /* USER CODE END PV */
 
@@ -57,42 +70,49 @@ static void MX_USART2_UART_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM1_Init(void);
+static void MX_TIM4_Init(void);
+static void MX_TIM8_Init(void);
 /* USER CODE BEGIN PFP */
+
+void setServoPosition(TIM_HandleTypeDef* htim, uint32_t channel, int degrees);
+void moveAllServos(int degrees);
+void setPresetPosition(int preset);
+void checkServoLimits(int* position);
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-void setServo1Speed(int8_t speed)
-{
-    uint32_t pulse;
-    if(speed > 100) speed = 100;
-    if(speed < -100) speed = -100;
-
-    pulse = 1500 + (speed * 5);
-    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, pulse);
-}
-
-void setServo2Speed(int8_t speed)
-{
-    uint32_t pulse;
-    if(speed > 100) speed = 100;
-    if(speed < -100) speed = -100;
-
-    pulse = 1500 + (speed * 5);
-    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, pulse);
-}
-
-void setServo3Speed(int8_t speed)
-{
-    uint32_t pulse;
-    if(speed > 100) speed = 100;
-    if(speed < -100) speed = -100;
-
-    pulse = 1500 + (speed * 5);
-    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, pulse);  // Assuming Channel 2 for third servo
-}
+//void setServo1Speed(int8_t speed)
+//{
+//    uint32_t pulse;
+//    if(speed > 100) speed = 100;
+//    if(speed < -100) speed = -100;
+//
+//    pulse = 1500 + (speed * 5);
+//    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, pulse);
+//}
+//
+//void setServo2Speed(int8_t speed)
+//{
+//    uint32_t pulse;
+//    if(speed > 100) speed = 100;
+//    if(speed < -100) speed = -100;
+//
+//    pulse = 1500 + (speed * 5);
+//    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, pulse);
+//}
+//
+//void setServo3Speed(int8_t speed)
+//{
+//    uint32_t pulse;
+//    if(speed > 100) speed = 100;
+//    if(speed < -100) speed = -100;
+//
+//    pulse = 1500 + (speed * 5);
+//    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, pulse);  // Assuming Channel 2 for third servo
+//}
 
 /* USER CODE END 0 */
 
@@ -129,7 +149,15 @@ int main(void)
   MX_TIM2_Init();
   MX_TIM3_Init();
   MX_TIM1_Init();
+  MX_TIM4_Init();
+  MX_TIM8_Init();
   /* USER CODE BEGIN 2 */
+
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_1);
 
   /* USER CODE END 2 */
 
@@ -137,47 +165,19 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+      /* Infinite loop */
+      /* USER CODE BEGIN WHILE */
 
-	  /* USER CODE BEGIN 2 */
-	    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
-	    HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
-	    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-	    /* USER CODE END 2 */
+	  setPresetPosition(1);
 
-	    /* Infinite loop */
-	    /* USER CODE BEGIN WHILE */
-	    while (1)
-	    {
-	    /* USER CODE END WHILE */
+	  HAL_Delay(10000);
 
-	    /* USER CODE BEGIN 3 */
+      /* USER CODE END WHILE */
 
-	    	// Rotate all servos clockwise
-			setServo1Speed(100);
-			setServo2Speed(100);
-			setServo3Speed(100);
-			HAL_Delay(2000);  // Run for 2 seconds
+      /* USER CODE BEGIN 3 */
+  }
+  /* USER CODE END 3 */
 
-			// Stop all servos
-			setServo1Speed(0);
-			setServo2Speed(0);
-			setServo3Speed(0);
-			HAL_Delay(1000);  // Wait for 1 second
-
-			// Rotate all servos counter-clockwise
-			setServo1Speed(-100);
-			setServo2Speed(-100);
-			setServo3Speed(-100);
-			HAL_Delay(2000);  // Run for 2 seconds
-
-			// Stop all servos
-			setServo1Speed(0);
-			setServo2Speed(0);
-			setServo3Speed(0);
-			HAL_Delay(1000);  // Wait for 1 second
-	    }
-	 }
-	    /* USER CODE END 3 */
 }
 
 /**
@@ -398,6 +398,125 @@ static void MX_TIM3_Init(void)
 }
 
 /**
+  * @brief TIM4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM4_Init(void)
+{
+
+  /* USER CODE BEGIN TIM4_Init 0 */
+
+  /* USER CODE END TIM4_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM4_Init 1 */
+
+  /* USER CODE END TIM4_Init 1 */
+  htim4.Instance = TIM4;
+  htim4.Init.Prescaler = 79;
+  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim4.Init.Period = 19999;
+  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_PWM_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM4_Init 2 */
+
+  /* USER CODE END TIM4_Init 2 */
+  HAL_TIM_MspPostInit(&htim4);
+
+}
+
+/**
+  * @brief TIM8 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM8_Init(void)
+{
+
+  /* USER CODE BEGIN TIM8_Init 0 */
+
+  /* USER CODE END TIM8_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+  TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = {0};
+
+  /* USER CODE BEGIN TIM8_Init 1 */
+
+  /* USER CODE END TIM8_Init 1 */
+  htim8.Instance = TIM8;
+  htim8.Init.Prescaler = 79;
+  htim8.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim8.Init.Period = 19999;
+  htim8.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim8.Init.RepetitionCounter = 0;
+  htim8.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_PWM_Init(&htim8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterOutputTrigger2 = TIM_TRGO2_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim8, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
+  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
+  if (HAL_TIM_PWM_ConfigChannel(&htim8, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
+  sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
+  sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
+  sBreakDeadTimeConfig.DeadTime = 0;
+  sBreakDeadTimeConfig.BreakState = TIM_BREAK_DISABLE;
+  sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
+  sBreakDeadTimeConfig.BreakFilter = 0;
+  sBreakDeadTimeConfig.Break2State = TIM_BREAK2_DISABLE;
+  sBreakDeadTimeConfig.Break2Polarity = TIM_BREAK2POLARITY_HIGH;
+  sBreakDeadTimeConfig.Break2Filter = 0;
+  sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
+  if (HAL_TIMEx_ConfigBreakDeadTime(&htim8, &sBreakDeadTimeConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM8_Init 2 */
+
+  /* USER CODE END TIM8_Init 2 */
+  HAL_TIM_MspPostInit(&htim8);
+
+}
+
+/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -470,6 +589,103 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+void setup() {
+  moveAllServos(FULL_ROTATION);
+}
+
+// Convert degrees to PWM pulse value (1000-2000 μs)
+uint32_t degreesToPulse(int degrees) {
+    // Ensure degrees are within bounds
+    if (degrees < 0) degrees = 0;
+    if (degrees > 360) degrees = 360;
+
+    // Convert degrees to pulse width (1000-2000 μs)
+    // For 360 continuous rotation servo:
+    // 1500 μs is stop
+    // 1000 μs is full speed one direction
+    // 2000 μs is full speed other direction
+    return 1500 + ((degrees - 180) * 5);
+}
+
+void setServoPosition(TIM_HandleTypeDef* htim, uint32_t channel, int degrees) {
+    uint32_t pulse = degreesToPulse(degrees);
+    __HAL_TIM_SET_COMPARE(htim, channel, pulse);
+}
+
+void moveAllServos(int degrees) {
+    checkServoLimits(&degrees);
+
+    // Update all servos
+    setServoPosition(&htim1, TIM_CHANNEL_1, degrees);
+    setServoPosition(&htim2, TIM_CHANNEL_1, degrees);
+    setServoPosition(&htim3, TIM_CHANNEL_1, degrees);
+    setServoPosition(&htim4, TIM_CHANNEL_1, degrees);
+    setServoPosition(&htim8, TIM_CHANNEL_1, degrees);
+
+    // Update current positions
+    currentPos1 = degrees;
+    currentPos2 = degrees;
+    currentPos3 = degrees;
+    currentPos4 = degrees;
+    currentPos5 = degrees;
+
+    // Add delay for servo movement
+    HAL_Delay(1000);
+}
+
+void checkServoLimits(int* position) {
+    if (*position < 0) {
+        *position = 0;
+    }
+    if (*position > FULL_ROTATION) {
+        *position = FULL_ROTATION;
+    }
+}
+
+void setPresetPosition(int preset) {
+    switch(preset) {
+        case 1: // All servos at full rotation
+            moveAllServos(FULL_ROTATION);
+            break;
+
+        case 2: // All servos at half rotation
+            moveAllServos(HALF_ROTATION);
+            break;
+
+        case 3: // All servos at quarter rotation
+            moveAllServos(QUARTER_ROTATION);
+            break;
+
+        case 4: // Custom positions
+            setServoPosition(&htim1, TIM_CHANNEL_1, 270);
+            setServoPosition(&htim2, TIM_CHANNEL_1, 180);
+            setServoPosition(&htim3, TIM_CHANNEL_1, 90);
+            setServoPosition(&htim4, TIM_CHANNEL_1, 45);
+            setServoPosition(&htim8, TIM_CHANNEL_1, 315);
+            currentPos1 = 270;
+            currentPos2 = 180;
+            currentPos3 = 90;
+            currentPos4 = 45;
+            currentPos5 = 315;
+            HAL_Delay(1000);
+            break;
+
+        case 5: // Another custom position set
+            setServoPosition(&htim1, TIM_CHANNEL_1, 45);
+            setServoPosition(&htim2, TIM_CHANNEL_1, 90);
+            setServoPosition(&htim3, TIM_CHANNEL_1, 180);
+            setServoPosition(&htim4, TIM_CHANNEL_1, 270);
+            setServoPosition(&htim8, TIM_CHANNEL_1, 360);
+            currentPos1 = 45;
+            currentPos2 = 90;
+            currentPos3 = 180;
+            currentPos4 = 270;
+            currentPos5 = 360;
+            HAL_Delay(1000);
+            break;
+    }
+}
 
 /* USER CODE END 4 */
 
