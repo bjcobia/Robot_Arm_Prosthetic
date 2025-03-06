@@ -37,6 +37,37 @@
 #define HALF_ROTATION 180     // Half rotation in degrees
 #define QUARTER_ROTATION 90   // Quarter rotation in degrees
 
+typedef enum {
+    LETTER_A = 0,
+    LETTER_B,
+    LETTER_C,
+    LETTER_D,
+    LETTER_E,
+    LETTER_F,
+    LETTER_G,
+    LETTER_H,
+    LETTER_I,
+    LETTER_J,
+    LETTER_K,
+    LETTER_L,
+    LETTER_M,
+    LETTER_N,
+    LETTER_O,
+    LETTER_P,
+    LETTER_Q,
+    LETTER_R,
+    LETTER_S,
+    LETTER_T,
+    LETTER_U,
+    LETTER_V,
+    LETTER_W,
+    LETTER_X,
+    LETTER_Y,
+    LETTER_Z,
+    LETTER_SPACE,  // For pauses between letters
+    LETTER_RESET   // Return to neutral position
+} SignLetter;
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -78,6 +109,106 @@ void setServoPosition(TIM_HandleTypeDef* htim, uint32_t channel, int degrees);
 void moveAllServos(int degrees);
 void setPresetPosition(int preset);
 void checkServoLimits(int* position);
+
+void signLetterA(void);
+void signLetterB(void);
+void signLetterC(void);
+void signLetterD(void);
+void signLetterE(void);
+void signLetterF(void);
+void signLetterG(void);
+void signLetterH(void);
+void signLetterI(void);
+void signLetterJ(void);
+void signLetterK(void);
+void signLetterL(void);
+void signLetterM(void);
+void signLetterN(void);
+void signLetterO(void);
+void signLetterP(void);
+void signLetterQ(void);
+void signLetterR(void);
+void signLetterS(void);
+void signLetterT(void);
+void signLetterU(void);
+void signLetterV(void);
+void signLetterW(void);
+void signLetterX(void);
+void signLetterY(void);
+void signLetterZ(void);
+
+void displayWord(const char* word);
+
+// Structure to store servo positions for a letter
+typedef struct {
+    int servo1Pos;  // Thumb
+    int servo2Pos;  // Index finger
+    int servo3Pos;  // Middle finger
+    int servo4Pos;  // Ring finger
+    int servo5Pos;  // Pinky finger
+    int delayMs;    // Delay after setting this position (for gesture timing)
+} LetterPosition;
+
+// Array of letter positions - to be filled in during testing
+// Values here are placeholders and should be adjusted based on testing
+LetterPosition letterPositions[28] = {
+    // LETTER_A
+    {180, 360, 360, 360, 360, 1000},
+    // LETTER_B
+    {360, 180, 180, 180, 180, 1000},
+    // LETTER_C
+    {270, 270, 270, 270, 270, 1000},
+    // LETTER_D
+    {360, 180, 360, 360, 360, 1000},
+    // LETTER_E
+    {180, 180, 180, 180, 180, 1000},
+    // LETTER_F
+    {270, 180, 180, 360, 360, 1000},
+    // LETTER_G
+    {180, 360, 180, 180, 180, 1000},
+    // LETTER_H
+    {180, 180, 180, 360, 360, 1000},
+    // LETTER_I
+    {180, 360, 360, 360, 180, 1000},
+    // LETTER_J
+    {180, 360, 360, 360, 180, 1500}, // J may need movement
+    // LETTER_K
+    {180, 180, 180, 360, 360, 1000},
+    // LETTER_L
+    {180, 180, 360, 360, 360, 1000},
+    // LETTER_M
+    {360, 270, 270, 270, 360, 1000},
+    // LETTER_N
+    {360, 270, 270, 360, 360, 1000},
+    // LETTER_O
+    {270, 270, 270, 270, 270, 1000},
+    // LETTER_P
+    {270, 180, 360, 360, 180, 1000},
+    // LETTER_Q
+    {270, 360, 180, 180, 180, 1000},
+    // LETTER_R
+    {180, 180, 180, 360, 360, 1000},
+    // LETTER_S
+    {180, 360, 360, 360, 360, 1000},
+    // LETTER_T
+    {180, 360, 180, 180, 180, 1000},
+    // LETTER_U
+    {360, 180, 180, 360, 360, 1000},
+    // LETTER_V
+    {360, 180, 180, 360, 360, 1000},
+    // LETTER_W
+    {360, 180, 180, 180, 360, 1000},
+    // LETTER_X
+    {360, 270, 360, 360, 360, 1000},
+    // LETTER_Y
+    {180, 360, 360, 360, 180, 1000},
+    // LETTER_Z
+    {180, 180, 360, 360, 360, 1500}, // Z may need movement
+    // LETTER_SPACE
+    {180, 180, 180, 180, 180, 1500},
+    // LETTER_RESET
+    {180, 180, 180, 180, 180, 1000}
+};
 
 /* USER CODE END PFP */
 
@@ -686,6 +817,100 @@ void setPresetPosition(int preset) {
             break;
     }
 }
+
+/**
+ * Set hand position for a specific letter
+ * @param letter The letter to display
+ */
+void setLetterPosition(SignLetter letter) {
+    // Get the positions for this letter
+    LetterPosition pos = letterPositions[letter];
+
+    // Set each servo position individually
+    setServoPosition(&htim1, TIM_CHANNEL_1, pos.servo1Pos);
+    setServoPosition(&htim2, TIM_CHANNEL_1, pos.servo2Pos);
+    setServoPosition(&htim3, TIM_CHANNEL_1, pos.servo3Pos);
+    setServoPosition(&htim4, TIM_CHANNEL_1, pos.servo4Pos);
+    setServoPosition(&htim8, TIM_CHANNEL_1, pos.servo5Pos);
+
+    // Update current positions
+    currentPos1 = pos.servo1Pos;
+    currentPos2 = pos.servo2Pos;
+    currentPos3 = pos.servo3Pos;
+    currentPos4 = pos.servo4Pos;
+    currentPos5 = pos.servo5Pos;
+
+    // Wait for the specified delay
+    HAL_Delay(pos.delayMs);
+}
+
+/**
+ * Display a word letter by letter
+ * @param word The word to display
+ */
+void displayWord(const char* word) {
+    int i = 0;
+
+    // Display each letter
+    while(word[i] != '\0') {
+        char c = word[i];
+
+        // Convert to uppercase for consistent handling
+        if(c >= 'a' && c <= 'z') {
+            c = c - 'a' + 'A';
+        }
+
+        // Display the letter
+        if(c >= 'A' && c <= 'Z') {
+            setLetterPosition((SignLetter)(c - 'A'));
+        }
+        else if(c == ' ') {
+            setLetterPosition(LETTER_SPACE);
+        }
+
+        // Pause between letters
+        HAL_Delay(500);
+
+        // Move to next letter
+        i++;
+    }
+
+    // Reset to neutral position after displaying the word
+    setLetterPosition(LETTER_RESET);
+}
+
+/**
+ * Individual letter functions for direct calling
+ * These provide a cleaner interface for displaying individual letters
+ */
+void signLetterA(void) { setLetterPosition(LETTER_A); }
+void signLetterB(void) { setLetterPosition(LETTER_B); }
+void signLetterC(void) { setLetterPosition(LETTER_C); }
+void signLetterD(void) { setLetterPosition(LETTER_D); }
+void signLetterE(void) { setLetterPosition(LETTER_E); }
+void signLetterF(void) { setLetterPosition(LETTER_F); }
+void signLetterG(void) { setLetterPosition(LETTER_G); }
+void signLetterH(void) { setLetterPosition(LETTER_H); }
+void signLetterI(void) { setLetterPosition(LETTER_I); }
+void signLetterJ(void) { setLetterPosition(LETTER_J); }
+void signLetterK(void) { setLetterPosition(LETTER_K); }
+void signLetterL(void) { setLetterPosition(LETTER_L); }
+void signLetterM(void) { setLetterPosition(LETTER_M); }
+void signLetterN(void) { setLetterPosition(LETTER_N); }
+void signLetterO(void) { setLetterPosition(LETTER_O); }
+void signLetterP(void) { setLetterPosition(LETTER_P); }
+void signLetterQ(void) { setLetterPosition(LETTER_Q); }
+void signLetterR(void) { setLetterPosition(LETTER_R); }
+void signLetterS(void) { setLetterPosition(LETTER_S); }
+void signLetterT(void) { setLetterPosition(LETTER_T); }
+void signLetterU(void) { setLetterPosition(LETTER_U); }
+void signLetterV(void) { setLetterPosition(LETTER_V); }
+void signLetterW(void) { setLetterPosition(LETTER_W); }
+void signLetterX(void) { setLetterPosition(LETTER_X); }
+void signLetterY(void) { setLetterPosition(LETTER_Y); }
+void signLetterZ(void) { setLetterPosition(LETTER_Z); }
+void signSpace(void) { setLetterPosition(LETTER_SPACE); }
+void resetHandPosition(void) { setLetterPosition(LETTER_RESET); }
 
 /* USER CODE END 4 */
 
