@@ -32,41 +32,39 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-// Define common angle constants for clarity and easy modification
-#define FULL_ROTATION 360     // Full rotation in degrees
-#define HALF_ROTATION 180     // Half rotation in degrees
-#define QUARTER_ROTATION 90   // Quarter rotation in degrees
+/* Servo control definitions */
+#define SERVO_STOP      1500    // Pulse width for stop (µs)
+#define SERVO_MAX_CW    1000    // Pulse width for max clockwise rotation (µs)
+#define SERVO_MAX_CCW   2000    // Pulse width for max counter-clockwise rotation (µs)
+
+/* Servo pins mapping - adjust based on your hardware connections */
+#define SERVO_THUMB     TIM1, TIM_CHANNEL_1
+#define SERVO_INDEX     TIM2, TIM_CHANNEL_1
+#define SERVO_MIDDLE    TIM3, TIM_CHANNEL_1
+#define SERVO_RING      TIM4, TIM_CHANNEL_1
+#define SERVO_PINKY     TIM8, TIM_CHANNEL_1
+
+/* Enum for fingers */
+typedef enum {
+    THUMB = 0,
+    INDEX,
+    MIDDLE,
+    RING,
+    PINKY
+} Finger;
 
 typedef enum {
-    LETTER_A = 0,
-    LETTER_B,
-    LETTER_C,
-    LETTER_D,
-    LETTER_E,
-    LETTER_F,
-    LETTER_G,
-    LETTER_H,
-    LETTER_I,
-    LETTER_J,
-    LETTER_K,
-    LETTER_L,
-    LETTER_M,
-    LETTER_N,
-    LETTER_O,
-    LETTER_P,
-    LETTER_Q,
-    LETTER_R,
-    LETTER_S,
-    LETTER_T,
-    LETTER_U,
-    LETTER_V,
-    LETTER_W,
-    LETTER_X,
-    LETTER_Y,
-    LETTER_Z,
-    LETTER_SPACE,  // For pauses between letters
-    LETTER_RESET   // Return to neutral position
-} SignLetter;
+    STOP = 0,
+    CLOCKWISE,
+    COUNTERCLOCKWISE
+} Direction;
+
+/* Structure to store servo states */
+typedef struct {
+    int speed;          // Speed percentage (0-100)
+    Direction dir;      // Current direction
+    uint32_t pulse;     // Current pulse width
+} ServoState;
 
 /* USER CODE END PD */
 
@@ -86,11 +84,14 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 
-int currentPos1 = 0;
-int currentPos2 = 0;
-int currentPos3 = 0;
-int currentPos4 = 0;
-int currentPos5 = 0;
+/* Global servo states */
+ServoState servoStates[5] = {
+    {0, STOP, SERVO_STOP},  // THUMB
+    {0, STOP, SERVO_STOP},  // INDEX
+    {0, STOP, SERVO_STOP},  // MIDDLE
+    {0, STOP, SERVO_STOP},  // RING
+    {0, STOP, SERVO_STOP}   // PINKY
+};
 
 /* USER CODE END PV */
 
@@ -98,152 +99,22 @@ int currentPos5 = 0;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_TIM1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
-static void MX_TIM1_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_TIM8_Init(void);
 /* USER CODE BEGIN PFP */
 
-void setServoPosition(TIM_HandleTypeDef* htim, uint32_t channel, int degrees);
-void moveAllServos(int degrees);
-void setPresetPosition(int preset);
-void checkServoLimits(int* position);
-
-void signLetterA(void);
-void signLetterB(void);
-void signLetterC(void);
-void signLetterD(void);
-void signLetterE(void);
-void signLetterF(void);
-void signLetterG(void);
-void signLetterH(void);
-void signLetterI(void);
-void signLetterJ(void);
-void signLetterK(void);
-void signLetterL(void);
-void signLetterM(void);
-void signLetterN(void);
-void signLetterO(void);
-void signLetterP(void);
-void signLetterQ(void);
-void signLetterR(void);
-void signLetterS(void);
-void signLetterT(void);
-void signLetterU(void);
-void signLetterV(void);
-void signLetterW(void);
-void signLetterX(void);
-void signLetterY(void);
-void signLetterZ(void);
-
-void displayWord(const char* word);
-
-// Structure to store servo positions for a letter
-typedef struct {
-    int servo1Pos;  // Thumb
-    int servo2Pos;  // Index finger
-    int servo3Pos;  // Middle finger
-    int servo4Pos;  // Ring finger
-    int servo5Pos;  // Pinky finger
-    int delayMs;    // Delay after setting this position (for gesture timing)
-} LetterPosition;
-
-// Array of letter positions - to be filled in during testing
-// Values here are placeholders and should be adjusted based on testing
-LetterPosition letterPositions[28] = {
-    // LETTER_A
-    {180, 360, 360, 360, 360, 1000},
-    // LETTER_B
-    {360, 180, 180, 180, 180, 1000},
-    // LETTER_C
-    {270, 270, 270, 270, 270, 1000},
-    // LETTER_D
-    {360, 180, 360, 360, 360, 1000},
-    // LETTER_E
-    {180, 180, 180, 180, 180, 1000},
-    // LETTER_F
-    {270, 180, 180, 360, 360, 1000},
-    // LETTER_G
-    {180, 360, 180, 180, 180, 1000},
-    // LETTER_H
-    {180, 180, 180, 360, 360, 1000},
-    // LETTER_I
-    {180, 360, 360, 360, 180, 1000},
-    // LETTER_J
-    {180, 360, 360, 360, 180, 1500}, // J may need movement
-    // LETTER_K
-    {180, 180, 180, 360, 360, 1000},
-    // LETTER_L
-    {180, 180, 360, 360, 360, 1000},
-    // LETTER_M
-    {360, 270, 270, 270, 360, 1000},
-    // LETTER_N
-    {360, 270, 270, 360, 360, 1000},
-    // LETTER_O
-    {270, 270, 270, 270, 270, 1000},
-    // LETTER_P
-    {270, 180, 360, 360, 180, 1000},
-    // LETTER_Q
-    {270, 360, 180, 180, 180, 1000},
-    // LETTER_R
-    {180, 180, 180, 360, 360, 1000},
-    // LETTER_S
-    {180, 360, 360, 360, 360, 1000},
-    // LETTER_T
-    {180, 360, 180, 180, 180, 1000},
-    // LETTER_U
-    {360, 180, 180, 360, 360, 1000},
-    // LETTER_V
-    {360, 180, 180, 360, 360, 1000},
-    // LETTER_W
-    {360, 180, 180, 180, 360, 1000},
-    // LETTER_X
-    {360, 270, 360, 360, 360, 1000},
-    // LETTER_Y
-    {180, 360, 360, 360, 180, 1000},
-    // LETTER_Z
-    {180, 180, 360, 360, 360, 1500}, // Z may need movement
-    // LETTER_SPACE
-    {180, 180, 180, 180, 180, 1500},
-    // LETTER_RESET
-    {180, 180, 180, 180, 180, 1000}
-};
+void Servo_Init(void);
+void Servo_SetMotion(Finger finger, Direction direction, int speed);
+void Servo_StopAll(void);
+void SignLetter(char letter, uint32_t duration);
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
-//void setServo1Speed(int8_t speed)
-//{
-//    uint32_t pulse;
-//    if(speed > 100) speed = 100;
-//    if(speed < -100) speed = -100;
-//
-//    pulse = 1500 + (speed * 5);
-//    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, pulse);
-//}
-//
-//void setServo2Speed(int8_t speed)
-//{
-//    uint32_t pulse;
-//    if(speed > 100) speed = 100;
-//    if(speed < -100) speed = -100;
-//
-//    pulse = 1500 + (speed * 5);
-//    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, pulse);
-//}
-//
-//void setServo3Speed(int8_t speed)
-//{
-//    uint32_t pulse;
-//    if(speed > 100) speed = 100;
-//    if(speed < -100) speed = -100;
-//
-//    pulse = 1500 + (speed * 5);
-//    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, pulse);  // Assuming Channel 2 for third servo
-//}
 
 /* USER CODE END 0 */
 
@@ -277,18 +148,26 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
+  MX_TIM1_Init();
   MX_TIM2_Init();
   MX_TIM3_Init();
-  MX_TIM1_Init();
   MX_TIM4_Init();
   MX_TIM8_Init();
+
   /* USER CODE BEGIN 2 */
 
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
-  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
-  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-  HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
-  HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_1);
+  SignLetter('A', 2000);
+
+  HAL_Delay(2000);
+
+  Servo_StopAll();
+
+  HAL_Delay(3000);
+
+  SignLetter('B', 1000);
+
+  SignLetter('A', 2000);
+
 
   /* USER CODE END 2 */
 
@@ -296,19 +175,11 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-      /* Infinite loop */
-      /* USER CODE BEGIN WHILE */
+    /* USER CODE END WHILE */
 
-	  setPresetPosition(1);
-
-	  HAL_Delay(10000);
-
-      /* USER CODE END WHILE */
-
-      /* USER CODE BEGIN 3 */
+    /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
-
 }
 
 /**
@@ -690,8 +561,9 @@ static void MX_USART2_UART_Init(void)
 static void MX_GPIO_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
-/* USER CODE BEGIN MX_GPIO_Init_1 */
-/* USER CODE END MX_GPIO_Init_1 */
+  /* USER CODE BEGIN MX_GPIO_Init_1 */
+
+  /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
@@ -715,203 +587,150 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
-/* USER CODE BEGIN MX_GPIO_Init_2 */
-/* USER CODE END MX_GPIO_Init_2 */
+  /* USER CODE BEGIN MX_GPIO_Init_2 */
+
+  /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
 
-void setup() {
-  moveAllServos(FULL_ROTATION);
-}
-
-// Convert degrees to PWM pulse value (1000-2000 μs)
-uint32_t degreesToPulse(int degrees) {
-    // Ensure degrees are within bounds
-    if (degrees < 0) degrees = 0;
-    if (degrees > 360) degrees = 360;
-
-    // Convert degrees to pulse width (1000-2000 μs)
-    // For 360 continuous rotation servo:
-    // 1500 μs is stop
-    // 1000 μs is full speed one direction
-    // 2000 μs is full speed other direction
-    return 1500 + ((degrees - 180) * 5);
-}
-
-void setServoPosition(TIM_HandleTypeDef* htim, uint32_t channel, int degrees) {
-    uint32_t pulse = degreesToPulse(degrees);
-    __HAL_TIM_SET_COMPARE(htim, channel, pulse);
-}
-
-void moveAllServos(int degrees) {
-    checkServoLimits(&degrees);
-
-    // Update all servos
-    setServoPosition(&htim1, TIM_CHANNEL_1, degrees);
-    setServoPosition(&htim2, TIM_CHANNEL_1, degrees);
-    setServoPosition(&htim3, TIM_CHANNEL_1, degrees);
-    setServoPosition(&htim4, TIM_CHANNEL_1, degrees);
-    setServoPosition(&htim8, TIM_CHANNEL_1, degrees);
-
-    // Update current positions
-    currentPos1 = degrees;
-    currentPos2 = degrees;
-    currentPos3 = degrees;
-    currentPos4 = degrees;
-    currentPos5 = degrees;
-
-    // Add delay for servo movement
-    HAL_Delay(1000);
-}
-
-void checkServoLimits(int* position) {
-    if (*position < 0) {
-        *position = 0;
-    }
-    if (*position > FULL_ROTATION) {
-        *position = FULL_ROTATION;
-    }
-}
-
-void setPresetPosition(int preset) {
-    switch(preset) {
-        case 1: // All servos at full rotation
-            moveAllServos(FULL_ROTATION);
-            break;
-
-        case 2: // All servos at half rotation
-            moveAllServos(HALF_ROTATION);
-            break;
-
-        case 3: // All servos at quarter rotation
-            moveAllServos(QUARTER_ROTATION);
-            break;
-
-        case 4: // Custom positions
-            setServoPosition(&htim1, TIM_CHANNEL_1, 270);
-            setServoPosition(&htim2, TIM_CHANNEL_1, 180);
-            setServoPosition(&htim3, TIM_CHANNEL_1, 90);
-            setServoPosition(&htim4, TIM_CHANNEL_1, 45);
-            setServoPosition(&htim8, TIM_CHANNEL_1, 315);
-            currentPos1 = 270;
-            currentPos2 = 180;
-            currentPos3 = 90;
-            currentPos4 = 45;
-            currentPos5 = 315;
-            HAL_Delay(1000);
-            break;
-
-        case 5: // Another custom position set
-            setServoPosition(&htim1, TIM_CHANNEL_1, 45);
-            setServoPosition(&htim2, TIM_CHANNEL_1, 90);
-            setServoPosition(&htim3, TIM_CHANNEL_1, 180);
-            setServoPosition(&htim4, TIM_CHANNEL_1, 270);
-            setServoPosition(&htim8, TIM_CHANNEL_1, 360);
-            currentPos1 = 45;
-            currentPos2 = 90;
-            currentPos3 = 180;
-            currentPos4 = 270;
-            currentPos5 = 360;
-            HAL_Delay(1000);
-            break;
-    }
-}
-
 /**
- * Set hand position for a specific letter
- * @param letter The letter to display
+ * @brief Sets the speed and direction of a servo
+ * @param finger: Which finger (THUMB, INDEX, MIDDLE, RING, PINKY)
+ * @param direction: STOP, CLOCKWISE, or COUNTERCLOCKWISE
+ * @param speed: Speed percentage (0-100)
+ * @retval None
  */
-void setLetterPosition(SignLetter letter) {
-    // Get the positions for this letter
-    LetterPosition pos = letterPositions[letter];
+void Servo_SetMotion(Finger finger, Direction direction, int speed) {
+    uint32_t pulse;
 
-    // Set each servo position individually
-    setServoPosition(&htim1, TIM_CHANNEL_1, pos.servo1Pos);
-    setServoPosition(&htim2, TIM_CHANNEL_1, pos.servo2Pos);
-    setServoPosition(&htim3, TIM_CHANNEL_1, pos.servo3Pos);
-    setServoPosition(&htim4, TIM_CHANNEL_1, pos.servo4Pos);
-    setServoPosition(&htim8, TIM_CHANNEL_1, pos.servo5Pos);
+    // Clamp speed to 0-100%
+    if (speed < 0) speed = 0;
+    if (speed > 100) speed = 100;
 
-    // Update current positions
-    currentPos1 = pos.servo1Pos;
-    currentPos2 = pos.servo2Pos;
-    currentPos3 = pos.servo3Pos;
-    currentPos4 = pos.servo4Pos;
-    currentPos5 = pos.servo5Pos;
-
-    // Wait for the specified delay
-    HAL_Delay(pos.delayMs);
-}
-
-/**
- * Display a word letter by letter
- * @param word The word to display
- */
-void displayWord(const char* word) {
-    int i = 0;
-
-    // Display each letter
-    while(word[i] != '\0') {
-        char c = word[i];
-
-        // Convert to uppercase for consistent handling
-        if(c >= 'a' && c <= 'z') {
-            c = c - 'a' + 'A';
-        }
-
-        // Display the letter
-        if(c >= 'A' && c <= 'Z') {
-            setLetterPosition((SignLetter)(c - 'A'));
-        }
-        else if(c == ' ') {
-            setLetterPosition(LETTER_SPACE);
-        }
-
-        // Pause between letters
-        HAL_Delay(500);
-
-        // Move to next letter
-        i++;
+    // Calculate pulse width based on direction and speed
+    if (direction == STOP) {
+        pulse = SERVO_STOP;
+    } else if (direction == CLOCKWISE) {
+        // Map 0-100% to SERVO_STOP-SERVO_MAX_CW
+        pulse = SERVO_STOP - ((SERVO_STOP - SERVO_MAX_CW) * speed / 100);
+    } else { // COUNTERCLOCKWISE
+        // Map 0-100% to SERVO_STOP-SERVO_MAX_CCW
+        pulse = SERVO_STOP + ((SERVO_MAX_CCW - SERVO_STOP) * speed / 100);
     }
 
-    // Reset to neutral position after displaying the word
-    setLetterPosition(LETTER_RESET);
-}
+    // Update servo state
+    servoStates[finger].speed = speed;
+    servoStates[finger].dir = direction;
+    servoStates[finger].pulse = pulse;
 
-/**
- * Individual letter functions for direct calling
- * These provide a cleaner interface for displaying individual letters
- */
-void signLetterA(void) { setLetterPosition(LETTER_A); }
-void signLetterB(void) { setLetterPosition(LETTER_B); }
-void signLetterC(void) { setLetterPosition(LETTER_C); }
-void signLetterD(void) { setLetterPosition(LETTER_D); }
-void signLetterE(void) { setLetterPosition(LETTER_E); }
-void signLetterF(void) { setLetterPosition(LETTER_F); }
-void signLetterG(void) { setLetterPosition(LETTER_G); }
-void signLetterH(void) { setLetterPosition(LETTER_H); }
-void signLetterI(void) { setLetterPosition(LETTER_I); }
-void signLetterJ(void) { setLetterPosition(LETTER_J); }
-void signLetterK(void) { setLetterPosition(LETTER_K); }
-void signLetterL(void) { setLetterPosition(LETTER_L); }
-void signLetterM(void) { setLetterPosition(LETTER_M); }
-void signLetterN(void) { setLetterPosition(LETTER_N); }
-void signLetterO(void) { setLetterPosition(LETTER_O); }
-void signLetterP(void) { setLetterPosition(LETTER_P); }
-void signLetterQ(void) { setLetterPosition(LETTER_Q); }
-void signLetterR(void) { setLetterPosition(LETTER_R); }
-void signLetterS(void) { setLetterPosition(LETTER_S); }
-void signLetterT(void) { setLetterPosition(LETTER_T); }
-void signLetterU(void) { setLetterPosition(LETTER_U); }
-void signLetterV(void) { setLetterPosition(LETTER_V); }
-void signLetterW(void) { setLetterPosition(LETTER_W); }
-void signLetterX(void) { setLetterPosition(LETTER_X); }
-void signLetterY(void) { setLetterPosition(LETTER_Y); }
-void signLetterZ(void) { setLetterPosition(LETTER_Z); }
-void signSpace(void) { setLetterPosition(LETTER_SPACE); }
-void resetHandPosition(void) { setLetterPosition(LETTER_RESET); }
+    // Apply pulse width to the appropriate timer
+    switch (finger) {
+        case THUMB:
+            __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, pulse);
+            break;
+        case INDEX:
+            __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, pulse);
+            break;
+        case MIDDLE:
+            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, pulse);
+            break;
+        case RING:
+            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, pulse);
+            break;
+        case PINKY:
+            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_1, pulse);
+            break;
+    }
+	}
 
+	/**
+	 * @brief Stops all servos
+	 * @param None
+	 * @retval None
+	 */
+	void Servo_StopAll(void) {
+		Servo_SetMotion(THUMB, STOP, 0);
+		Servo_SetMotion(INDEX, STOP, 0);
+		Servo_SetMotion(MIDDLE, STOP, 0);
+		Servo_SetMotion(RING, STOP, 0);
+		Servo_SetMotion(PINKY, STOP, 0);
+
+	    HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
+	    HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
+	    HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_1);
+	    HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_1);
+	    HAL_TIM_PWM_Stop(&htim8, TIM_CHANNEL_1);
+	}
+
+	/**
+	 * @brief Initialize all servo timers and start PWM
+	 * @param None
+	 * @retval None
+	 */
+	void Servo_Init(void) {
+	    // Start all PWM channels
+	    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+	    HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+	    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+	    HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
+	    HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_1);
+
+//	    // Initialize all servos to stop position
+//	    Servo_StopAll();
+	}
+
+	/**
+	 * @brief Example function to demonstrate a sign language letter
+	 * @param letter: ASCII character (A-Z)
+	 * @param duration: How long to hold the position (in ms)
+	 * @retval None
+	 */
+	void SignLetter(char letter, uint32_t duration) {
+	    // Reset to neutral position
+	    Servo_Init();
+	    HAL_Delay(500); // Wait for fingers to return to neutral
+
+	    // Set finger positions based on the letter
+	    switch(letter) {
+	        case 'A':
+	            // Example: Make 'A' sign (thumb out, all other fingers closed)
+	            Servo_SetMotion(THUMB, CLOCKWISE, 70);
+	            Servo_SetMotion(INDEX, COUNTERCLOCKWISE, 90);
+	            Servo_SetMotion(MIDDLE, COUNTERCLOCKWISE, 90);
+	            Servo_SetMotion(RING, COUNTERCLOCKWISE, 90);
+	            Servo_SetMotion(PINKY, COUNTERCLOCKWISE, 90);
+	            break;
+
+	        case 'B':
+	            // Example: Make 'B' sign (thumb in, all other fingers straight)
+	            Servo_SetMotion(THUMB, COUNTERCLOCKWISE, 80);
+	            Servo_SetMotion(INDEX, CLOCKWISE, 50);
+	            Servo_SetMotion(MIDDLE, CLOCKWISE, 50);
+	            Servo_SetMotion(RING, CLOCKWISE, 50);
+	            Servo_SetMotion(PINKY, CLOCKWISE, 50);
+	            break;
+
+	        // Add more letters as needed
+
+	        default:
+	            // Default position (rest)
+	            Servo_StopAll();
+	            break;
+	    }
+
+	    // Hold the position for the specified duration
+	    HAL_Delay(duration);
+
+	    // Return to neutral position
+	    Servo_StopAll();
+	}
+
+	/**
+	 * @brief Initialize all servo timers and start PWM
+	 * @param None
+	 * @retval None
+	 */
 /* USER CODE END 4 */
 
 /**
