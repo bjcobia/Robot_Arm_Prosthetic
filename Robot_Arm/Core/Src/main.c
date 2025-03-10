@@ -44,7 +44,6 @@
 #define SERVO_RING      TIM4, TIM_CHANNEL_1
 #define SERVO_PINKY     TIM8, TIM_CHANNEL_1
 
-/* Enum for fingers */
 typedef enum {
     THUMB = 0,
     INDEX,
@@ -59,7 +58,7 @@ typedef enum {
     COUNTERCLOCKWISE
 } Direction;
 
-/* Structure to store servo states */
+/* servo states */
 typedef struct {
     int speed;          // Speed percentage (0-100)
     Direction dir;      // Current direction
