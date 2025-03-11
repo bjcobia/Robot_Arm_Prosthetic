@@ -60,8 +60,8 @@ all: main-build
 main-build: Robot_Arm.elf secondary-outputs
 
 # Tool invocations
-Robot_Arm.elf Robot_Arm.map: $(OBJS) $(USER_OBJS) C:\Users\bradm\OneDrive\Desktop\ECEN361\FINAL_PROJECT_STUFF\Robot_Arm_Prosthetic\Robot_Arm\STM32L476RGTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "Robot_Arm.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\bradm\OneDrive\Desktop\ECEN361\FINAL_PROJECT_STUFF\Robot_Arm_Prosthetic\Robot_Arm\STM32L476RGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Robot_Arm.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Robot_Arm.elf Robot_Arm.map: $(OBJS) $(USER_OBJS) C:\Users\eafli\OneDrive\Documents\GitHub\Robot_Arm_Prosthetic\Robot_Arm\STM32L476RGTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "Robot_Arm.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\eafli\OneDrive\Documents\GitHub\Robot_Arm_Prosthetic\Robot_Arm\STM32L476RGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Robot_Arm.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

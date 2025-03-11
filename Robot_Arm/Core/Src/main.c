@@ -19,9 +19,11 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <string.h>
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -82,6 +84,10 @@ TIM_HandleTypeDef htim8;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+char rxBuffer[1]; /* Buffer for receiving a single character */
+char message[256]; /* Buffer to store the complete message */
+uint16_t messageIndex = 0;
+uint8_t messageReady = 0; /* Flag to indicate a message is in buffer waiting to be processed*/
 
 /* Global servo states */
 ServoState servoStates[5] = {
@@ -98,9 +104,9 @@ ServoState servoStates[5] = {
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
-static void MX_TIM1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_TIM1_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_TIM8_Init(void);
 /* USER CODE BEGIN PFP */
@@ -109,6 +115,10 @@ void Servo_Init(void);
 void Servo_SetMotion(Finger finger, Direction direction, int speed);
 void Servo_StopAll(void);
 void SignLetter(char letter, uint32_t duration);
+
+static void MX_USART2_UART_Init(void);
+void ProcessReceivedMessage(char* msg);
+uint8_t IsButtonPressed(void);
 
 /* USER CODE END PFP */
 
@@ -147,25 +157,27 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
-  MX_TIM1_Init();
   MX_TIM2_Init();
   MX_TIM3_Init();
+  MX_TIM1_Init();
   MX_TIM4_Init();
   MX_TIM8_Init();
-
   /* USER CODE BEGIN 2 */
 
-  SignLetter('A', 2000);
+  memset(message, 0, sizeof(message));
+  HAL_UART_Receive_IT(&huart2, (uint8_t*)rxBuffer, 1);
 
-  HAL_Delay(2000);
-
-  Servo_StopAll();
-
-  HAL_Delay(3000);
-
-  SignLetter('B', 1000);
-
-  SignLetter('A', 2000);
+//  SignLetter('A', 2000);
+//
+//  HAL_Delay(2000);
+//
+//  Servo_StopAll();
+//
+//  HAL_Delay(3000);
+//
+//  SignLetter('B', 1000);
+//
+//  SignLetter('A', 2000);
 
 
   /* USER CODE END 2 */
@@ -174,6 +186,19 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	if (IsButtonPressed() && messageReady)
+	  {
+		/* Process the message when button is pressed and message is available */
+		ProcessReceivedMessage(message);
+
+		/* Reset message buffer */
+		messageIndex = 0;
+		messageReady = 0;
+		memset(message, 0, sizeof(message));
+
+		/* Debounce */
+		HAL_Delay(200);
+	  }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -560,9 +585,9 @@ static void MX_USART2_UART_Init(void)
 static void MX_GPIO_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
-  /* USER CODE BEGIN MX_GPIO_Init_1 */
+/* USER CODE BEGIN MX_GPIO_Init_1 */
 
-  /* USER CODE END MX_GPIO_Init_1 */
+/* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
@@ -586,12 +611,76 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
-  /* USER CODE BEGIN MX_GPIO_Init_2 */
+/* USER CODE BEGIN MX_GPIO_Init_2 */
 
-  /* USER CODE END MX_GPIO_Init_2 */
+/* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
+
+
+/* Button press detection function - modify for your specific board */
+uint8_t IsButtonPressed(void)
+{
+  /* Assuming B2 is connected to PC13 (common on many Nucleo boards) */
+  /* Note: B2 is typically active LOW (returns 0 when pressed) */
+
+  if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13) == GPIO_PIN_RESET)
+  {
+    return 1; /* Button pressed */
+  }
+  return 0; /* Button not pressed */
+}
+
+/* This function is called when a character is received via UART */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+  if (huart->Instance == USART2) /* Change to match your UART instance */
+  {
+    /* Silently add character to message buffer (no echo) */
+    if (messageIndex < sizeof(message) - 1) /* Leave space for null terminator */
+    {
+      message[messageIndex++] = rxBuffer[0];
+      message[messageIndex] = '\0'; /* Always keep null-terminated */
+
+      /* Set flag indicating we have data ready to process */
+      messageReady = 1;
+    }
+    else
+    {
+      /* Buffer overflow, reset */
+      messageIndex = 0;
+      memset(message, 0, sizeof(message));
+
+      /* Consider sending an overflow message */
+      char overflowMsg[] = "Buffer overflow! Message cleared.\r\n";
+      HAL_UART_Transmit(&huart2, (uint8_t*)overflowMsg, strlen(overflowMsg), 1000);
+    }
+
+    /* Start the next reception */
+    HAL_UART_Receive_IT(huart, (uint8_t*)rxBuffer, 1);
+  }
+}
+
+/* Process the complete received message, currently it echos back to the UART port once B1 has been pressed. Later this needs to be changes to sign the letters of the words */
+void ProcessReceivedMessage(char* msg)
+{
+  /* First, send a notification that button was pressed */
+  char buttonMsg[] = "Button B2 pressed - Echoing received message:\r\n";
+  HAL_UART_Transmit(&huart2, (uint8_t*)buttonMsg, strlen(buttonMsg), 1000);
+
+  /* Echo the exact message that was received */
+  HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), 1000);
+
+  /* Add a newline for better readability */
+  char newline[] = "\r\n";
+  HAL_UART_Transmit(&huart2, (uint8_t*)newline, strlen(newline), 1000);
+
+  /* Optional: Notify completion */
+  char completeMsg[] = "Message echo complete\r\n";
+  HAL_UART_Transmit(&huart2, (uint8_t*)completeMsg, strlen(completeMsg), 1000);
+}
+
 
 /**
  * @brief Sets the speed and direction of a servo
