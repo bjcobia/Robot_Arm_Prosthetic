@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -81,6 +82,18 @@ TIM_HandleTypeDef htim8;
 
 UART_HandleTypeDef huart2;
 
+/* Definitions for defaultTask */
+osThreadId_t defaultTaskHandle;
+const osThreadAttr_t defaultTask_attributes = {
+  .name = "defaultTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for Servo_Letters */
+osTimerId_t Servo_LettersHandle;
+const osTimerAttr_t Servo_Letters_attributes = {
+  .name = "Servo_Letters"
+};
 /* USER CODE BEGIN PV */
 
 /* Global servo states */
@@ -98,17 +111,21 @@ ServoState servoStates[5] = {
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
-static void MX_TIM1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_TIM1_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_TIM8_Init(void);
+void StartDefaultTask(void *argument);
+void Servo_Letter(void *argument);
+
 /* USER CODE BEGIN PFP */
 
 void Servo_Init(void);
 void Servo_SetMotion(Finger finger, Direction direction, int speed);
 void Servo_StopAll(void);
 void SignLetter(char letter, uint32_t duration);
+void ResetHand(void);
 
 /* USER CODE END PFP */
 
@@ -147,28 +164,59 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
-  MX_TIM1_Init();
   MX_TIM2_Init();
   MX_TIM3_Init();
+  MX_TIM1_Init();
   MX_TIM4_Init();
   MX_TIM8_Init();
-
   /* USER CODE BEGIN 2 */
 
-  SignLetter('A', 2000);
+  SignLetter('B', 2000);
 
   HAL_Delay(2000);
 
-  Servo_StopAll();
-
-  HAL_Delay(3000);
-
-  SignLetter('B', 1000);
-
-  SignLetter('A', 2000);
-
 
   /* USER CODE END 2 */
+
+  /* Init scheduler */
+  osKernelInitialize();
+
+  /* USER CODE BEGIN RTOS_MUTEX */
+  /* add mutexes, ... */
+  /* USER CODE END RTOS_MUTEX */
+
+  /* USER CODE BEGIN RTOS_SEMAPHORES */
+  /* add semaphores, ... */
+  /* USER CODE END RTOS_SEMAPHORES */
+
+  /* Create the timer(s) */
+  /* creation of Servo_Letters */
+  Servo_LettersHandle = osTimerNew(Servo_Letter, osTimerOnce, NULL, &Servo_Letters_attributes);
+
+  /* USER CODE BEGIN RTOS_TIMERS */
+  /* start timers, add new ones, ... */
+  /* USER CODE END RTOS_TIMERS */
+
+  /* USER CODE BEGIN RTOS_QUEUES */
+  /* add queues, ... */
+  /* USER CODE END RTOS_QUEUES */
+
+  /* Create the thread(s) */
+  /* creation of defaultTask */
+  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+
+  /* USER CODE BEGIN RTOS_THREADS */
+  /* add threads, ... */
+  /* USER CODE END RTOS_THREADS */
+
+  /* USER CODE BEGIN RTOS_EVENTS */
+  /* add events, ... */
+  /* USER CODE END RTOS_EVENTS */
+
+  /* Start scheduler */
+  osKernelStart();
+
+  /* We should never get here as control is now taken by the scheduler */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
@@ -699,6 +747,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 	            Servo_SetMotion(MIDDLE, COUNTERCLOCKWISE, 90);
 	            Servo_SetMotion(RING, COUNTERCLOCKWISE, 90);
 	            Servo_SetMotion(PINKY, COUNTERCLOCKWISE, 90);
+
+
 	            break;
 
 	        case 'B':
@@ -710,7 +760,7 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 	            Servo_SetMotion(PINKY, CLOCKWISE, 50);
 	            break;
 
-	        // Add more letters as needed
+	        case 'C':
 
 	        default:
 	            // Default position (rest)
@@ -725,12 +775,75 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 	    Servo_StopAll();
 	}
 
+	void ResetHand(void) {
+	    // Make sure PWM is active
+	    Servo_Init();
+
+	    Servo_SetMotion(THUMB, COUNTERCLOCKWISE, 60);
+	    Servo_SetMotion(INDEX, CLOCKWISE, 80);
+	    Servo_SetMotion(MIDDLE, CLOCKWISE, 80);
+	    Servo_SetMotion(RING, CLOCKWISE, 80);
+	    Servo_SetMotion(PINKY, CLOCKWISE, 80);
+
+	    // Give servos time to reach position
+	    HAL_Delay(2000);
+	}
+
+
 	/**
 	 * @brief Initialize all servo timers and start PWM
 	 * @param None
 	 * @retval None
 	 */
 /* USER CODE END 4 */
+
+/* USER CODE BEGIN Header_StartDefaultTask */
+/**
+  * @brief  Function implementing the defaultTask thread.
+  * @param  argument: Not used
+  * @retval None
+  */
+/* USER CODE END Header_StartDefaultTask */
+void StartDefaultTask(void *argument)
+{
+  /* USER CODE BEGIN 5 */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END 5 */
+}
+
+/* Servo_Letter function */
+void Servo_Letter(void *argument)
+{
+  /* USER CODE BEGIN Servo_Letter */
+
+  /* USER CODE END Servo_Letter */
+}
+
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM5 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  /* USER CODE BEGIN Callback 0 */
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM5)
+  {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+
+  /* USER CODE END Callback 1 */
+}
 
 /**
   * @brief  This function is executed in case of error occurrence.
