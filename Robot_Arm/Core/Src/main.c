@@ -172,11 +172,17 @@ int16_t middle_current;
 int16_t ring_current;
 int16_t pinky_current;
 
-int16_t thumb_desired_position;
-int16_t index_desired_position;
-int16_t middle_desired_position;
-int16_t ring_desired_position;
-int16_t pinky_desired_position;
+int thumb_desired_position;
+int index_desired_position;
+int middle_desired_position;
+int ring_desired_position;
+int pinky_desired_position;
+//
+//int *ptr_thumb = &thumb_desired_position;
+//int *ptr_index = &index_desired_position;
+//int *ptr_middle;
+//int *ptr_ring;
+//int *ptr_pinky;
 
 
 /* USER CODE END PFP */
@@ -883,12 +889,12 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 	}
 
 	int Direction_Decider(int* Desired_Position){
-		if(Desired_Position < 0){
-			*Desired_Position = *Desired_Position*-1;
-			return 1;
+		if(*Desired_Position < 0){
+			*Desired_Position = *Desired_Position * -1;
+			return CLOCKWISE;
 		}
 		else{
-			return 2;
+			return COUNTERCLOCKWISE;
 		}
 	}
 
@@ -1097,11 +1103,11 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 	            break;
 	    }
 
-	    Servo_SetMotion(THUMB, Direction_Decider(thumb_desired_position), 100);
-	    Servo_SetMotion(INDEX, Direction_Decider(index_desired_position), 100);
-	    Servo_SetMotion(MIDDLE, Direction_Decider(middle_desired_position), 100);
-	    Servo_SetMotion(RING, Direction_Decider(ring_desired_position), 100);
-	    Servo_SetMotion(PINKY, Direction_Decider(pinky_desired_position), 100);
+	    Servo_SetMotion(THUMB, Direction_Decider(&thumb_desired_position), 100);
+	    Servo_SetMotion(INDEX, Direction_Decider(&index_desired_position), 100);
+	    Servo_SetMotion(MIDDLE, Direction_Decider(&middle_desired_position), 100);
+	    Servo_SetMotion(RING, Direction_Decider(&ring_desired_position), 100);
+	    Servo_SetMotion(PINKY, Direction_Decider(&pinky_desired_position), 100);
 
 	    // Return to neutral position
 	    Servo_StopAll();
