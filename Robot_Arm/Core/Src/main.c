@@ -46,11 +46,11 @@
 #define SERVO_RING      TIM4, TIM_CHANNEL_1
 #define SERVO_PINKY     TIM8, TIM_CHANNEL_1
 
-#define THUMB_CLOSED 1000
-#define INDEX_CLOSED 1000
-#define MIDDLE_CLOSED 1000
-#define RING_CLOSED 1000
-#define PINKY_CLOSED 1000
+#define THUMB_CLOSED 10000
+#define INDEX_CLOSED 10000
+#define MIDDLE_CLOSED 10000
+#define RING_CLOSED 10000
+#define PINKY_CLOSED 10000
 
 typedef enum {
     THUMB = 0,
@@ -166,11 +166,11 @@ static void MX_USART2_UART_Init(void);
 void ProcessReceivedMessage(char* msg);
 uint8_t IsButtonPressed(void);
 
-int16_t thumb_current;
-int16_t index_current;
-int16_t middle_current;
-int16_t ring_current;
-int16_t pinky_current;
+int16_t thumb_current=0;
+int16_t index_current=0;
+int16_t middle_current=0;
+int16_t ring_current=0;
+int16_t pinky_current=0;
 
 int thumb_desired_position;
 int index_desired_position;
@@ -235,7 +235,7 @@ int main(void)
 //  memset(message, 0, sizeof(message));
 //  HAL_UART_Receive_IT(&huart2, (uint8_t*)rxBuffer, 1);
 
-//  SignLetter('A', 2000);
+  SignLetter('A');
 //
 //  HAL_Delay(2000);
 //
@@ -306,20 +306,20 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	if (IsButtonPressed() && messageReady)
-	  {
-		/* Process the message when button is pressed and message is available */
-		ProcessReceivedMessage(message);
-
-		/* Reset message buffer */
-		messageIndex = 0;
-		messageReady = 0;
-		memset(message, 0, sizeof(message));
-
-		/* Debounce */
-		HAL_Delay(200);
-	  }
-    /* USER CODE END WHILE */
+//	if (IsButtonPressed() && messageReady)
+//	  {
+//		/* Process the message when button is pressed and message is available */
+//		ProcessReceivedMessage(message);
+//
+//		/* Reset message buffer */
+//		messageIndex = 0;
+//		messageReady = 0;
+//		memset(message, 0, sizeof(message));
+//
+//		/* Debounce */
+//		HAL_Delay(200);
+//	  }
+//    /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
   }
@@ -907,8 +907,6 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 	void SignLetter(char letter) {
 	    // Reset to neutral position
 	    Servo_Init();
-	    HAL_Delay(500); // Wait for fingers to return to neutral
-
 
 
 	    // Set finger positions based on the letter
@@ -1147,7 +1145,6 @@ void StartDefaultTask(void *argument)
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
 
-	SignLetter('A');
 
 	osTimerStart(Index_FingerHandle, index_current);
 	osTimerStart(Thumb_FingerHandle, thumb_current);
@@ -1155,6 +1152,7 @@ void StartDefaultTask(void *argument)
 	osTimerStart(Ring_FingerHandle, thumb_current);
 	osTimerStart(Pinky_FingerHandle, thumb_current);
 
+	SignLetter('A');
   for(;;)
   {
     osDelay(1);
