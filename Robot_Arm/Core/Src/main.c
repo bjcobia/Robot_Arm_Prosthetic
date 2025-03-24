@@ -46,11 +46,11 @@
 #define SERVO_RING      TIM4, TIM_CHANNEL_1
 #define SERVO_PINKY     TIM8, TIM_CHANNEL_1
 
-#define THUMB_CLOSED 10000
-#define INDEX_CLOSED 10000
-#define MIDDLE_CLOSED 10000
-#define RING_CLOSED 10000
-#define PINKY_CLOSED 10000
+#define THUMB_CLOSED 2000
+#define INDEX_CLOSED 2000
+#define MIDDLE_CLOSED 2000
+#define RING_CLOSED 2000
+#define PINKY_CLOSED 2000
 
 typedef enum {
     THUMB = 0,
@@ -166,11 +166,11 @@ static void MX_USART2_UART_Init(void);
 void ProcessReceivedMessage(char* msg);
 uint8_t IsButtonPressed(void);
 
-int16_t thumb_current=0;
-int16_t index_current=0;
-int16_t middle_current=0;
-int16_t ring_current=0;
-int16_t pinky_current=0;
+int16_t thumb_current = 0;
+int16_t index_current = 0;
+int16_t middle_current = 0;
+int16_t ring_current = 0;
+int16_t pinky_current = 0;
 
 int thumb_desired_position;
 int index_desired_position;
@@ -234,8 +234,6 @@ int main(void)
 //
 //  memset(message, 0, sizeof(message));
 //  HAL_UART_Receive_IT(&huart2, (uint8_t*)rxBuffer, 1);
-
-  SignLetter('A');
 //
 //  HAL_Delay(2000);
 //
@@ -266,16 +264,16 @@ int main(void)
   Index_FingerHandle = osTimerNew(Index, osTimerOnce, NULL, &Index_Finger_attributes);
 
   /* creation of Thumb_Finger */
-  Thumb_FingerHandle = osTimerNew(Thumb, osTimerPeriodic, NULL, &Thumb_Finger_attributes);
+  Thumb_FingerHandle = osTimerNew(Thumb, osTimerOnce, NULL, &Thumb_Finger_attributes);
 
   /* creation of Middle_Finger */
-  Middle_FingerHandle = osTimerNew(Middle, osTimerPeriodic, NULL, &Middle_Finger_attributes);
+  Middle_FingerHandle = osTimerNew(Middle, osTimerOnce, NULL, &Middle_Finger_attributes);
 
   /* creation of Ring_Finger */
-  Ring_FingerHandle = osTimerNew(Ring, osTimerPeriodic, NULL, &Ring_Finger_attributes);
+  Ring_FingerHandle = osTimerNew(Ring, osTimerOnce, NULL, &Ring_Finger_attributes);
 
   /* creation of Pinky_Finger */
-  Pinky_FingerHandle = osTimerNew(Pinky, osTimerPeriodic, NULL, &Pinky_Finger_attributes);
+  Pinky_FingerHandle = osTimerNew(Pinky, osTimerOnce, NULL, &Pinky_Finger_attributes);
 
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
@@ -319,7 +317,7 @@ int main(void)
 //		/* Debounce */
 //		HAL_Delay(200);
 //	  }
-//    /* USER CODE END WHILE */
+    /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
   }
@@ -1106,9 +1104,6 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 	    Servo_SetMotion(MIDDLE, Direction_Decider(&middle_desired_position), 100);
 	    Servo_SetMotion(RING, Direction_Decider(&ring_desired_position), 100);
 	    Servo_SetMotion(PINKY, Direction_Decider(&pinky_desired_position), 100);
-
-	    // Return to neutral position
-	    Servo_StopAll();
 	}
 
 	void ResetHand(void) {
@@ -1144,15 +1139,16 @@ void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
-
-
-	osTimerStart(Index_FingerHandle, index_current);
-	osTimerStart(Thumb_FingerHandle, thumb_current);
-	osTimerStart(Middle_FingerHandle, thumb_current);
-	osTimerStart(Ring_FingerHandle, thumb_current);
-	osTimerStart(Pinky_FingerHandle, thumb_current);
-
 	SignLetter('A');
+
+
+
+	osTimerStart(Index_FingerHandle, 10);
+	osTimerStart(Thumb_FingerHandle, 2000);
+	osTimerStart(Middle_FingerHandle, middle_current);
+	osTimerStart(Ring_FingerHandle, ring_current);
+	osTimerStart(Pinky_FingerHandle, pinky_current);
+
   for(;;)
   {
     osDelay(1);
@@ -1164,6 +1160,18 @@ void StartDefaultTask(void *argument)
 void Index(void *argument)
 {
   /* USER CODE BEGIN Index */
+	Servo_SetMotion(THUMB, STOP, 0);
+			Servo_SetMotion(INDEX, STOP, 0);
+			Servo_SetMotion(MIDDLE, STOP, 0);
+			Servo_SetMotion(RING, STOP, 0);
+			Servo_SetMotion(PINKY, STOP, 0);
+
+		    HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
+		    HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
+		    HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_1);
+		    HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_1);
+		    HAL_TIM_PWM_Stop(&htim8, TIM_CHANNEL_1);
+
 
   /* USER CODE END Index */
 }
@@ -1172,7 +1180,7 @@ void Index(void *argument)
 void Thumb(void *argument)
 {
   /* USER CODE BEGIN Thumb */
-
+	HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
   /* USER CODE END Thumb */
 }
 
