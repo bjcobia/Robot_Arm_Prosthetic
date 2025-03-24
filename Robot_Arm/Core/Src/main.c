@@ -24,6 +24,7 @@
 /* USER CODE BEGIN Includes */
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -46,11 +47,11 @@
 #define SERVO_RING      TIM4, TIM_CHANNEL_1
 #define SERVO_PINKY     TIM8, TIM_CHANNEL_1
 
-#define THUMB_CLOSED 10000
-#define INDEX_CLOSED 10000
-#define MIDDLE_CLOSED 10000
-#define RING_CLOSED 10000
-#define PINKY_CLOSED 10000
+#define THUMB_CLOSED 1000
+#define INDEX_CLOSED 1000
+#define MIDDLE_CLOSED 1000
+#define RING_CLOSED 1000
+#define PINKY_CLOSED 1000
 
 typedef enum {
     THUMB = 0,
@@ -162,6 +163,7 @@ void Servo_StopAll(void);
 void SignLetter(char letter);
 int Direction_Decider(int* Desired_Position);
 
+
 static void MX_USART2_UART_Init(void);
 void ProcessReceivedMessage(char* msg);
 uint8_t IsButtonPressed(void);
@@ -235,17 +237,14 @@ int main(void)
 //  memset(message, 0, sizeof(message));
 //  HAL_UART_Receive_IT(&huart2, (uint8_t*)rxBuffer, 1);
 
-  SignLetter('A');
+//  SignLetter('A');
 //
 //  HAL_Delay(2000);
 //
 //  Servo_StopAll();
 //
 //  HAL_Delay(3000);
-//
-//  SignLetter('B', 1000);
-//
-//  SignLetter('A', 2000);
+
 
 
   /* USER CODE END 2 */
@@ -266,16 +265,16 @@ int main(void)
   Index_FingerHandle = osTimerNew(Index, osTimerOnce, NULL, &Index_Finger_attributes);
 
   /* creation of Thumb_Finger */
-  Thumb_FingerHandle = osTimerNew(Thumb, osTimerPeriodic, NULL, &Thumb_Finger_attributes);
+  Thumb_FingerHandle = osTimerNew(Thumb, osTimerOnce, NULL, &Thumb_Finger_attributes);
 
   /* creation of Middle_Finger */
-  Middle_FingerHandle = osTimerNew(Middle, osTimerPeriodic, NULL, &Middle_Finger_attributes);
+  Middle_FingerHandle = osTimerNew(Middle, osTimerOnce, NULL, &Middle_Finger_attributes);
 
   /* creation of Ring_Finger */
-  Ring_FingerHandle = osTimerNew(Ring, osTimerPeriodic, NULL, &Ring_Finger_attributes);
+  Ring_FingerHandle = osTimerNew(Ring, osTimerOnce, NULL, &Ring_Finger_attributes);
 
   /* creation of Pinky_Finger */
-  Pinky_FingerHandle = osTimerNew(Pinky, osTimerPeriodic, NULL, &Pinky_Finger_attributes);
+  Pinky_FingerHandle = osTimerNew(Pinky, osTimerOnce, NULL, &Pinky_Finger_attributes);
 
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
@@ -319,7 +318,7 @@ int main(void)
 //		/* Debounce */
 //		HAL_Delay(200);
 //	  }
-//    /* USER CODE END WHILE */
+    /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
   }
@@ -731,6 +730,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
   /* USER CODE END MX_GPIO_Init_2 */
@@ -799,6 +802,7 @@ void ProcessReceivedMessage(char* msg)
   /* Optional: Notify completion */
   char completeMsg[] = "Message echo complete\r\n";
   HAL_UART_Transmit(&huart2, (uint8_t*)completeMsg, strlen(completeMsg), 1000);
+
 }
 
 
@@ -917,7 +921,7 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
 				ring_desired_position = ring_current - 1 * RING_CLOSED;
 			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
-	            break;
+			    break;
 
 	        case 'B':
 	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
@@ -1101,14 +1105,18 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 	            break;
 	    }
 
-	    Servo_SetMotion(THUMB, Direction_Decider(&thumb_desired_position), 100);
-	    Servo_SetMotion(INDEX, Direction_Decider(&index_desired_position), 100);
-	    Servo_SetMotion(MIDDLE, Direction_Decider(&middle_desired_position), 100);
-	    Servo_SetMotion(RING, Direction_Decider(&ring_desired_position), 100);
-	    Servo_SetMotion(PINKY, Direction_Decider(&pinky_desired_position), 100);
+		osTimerStart(Index_FingerHandle, abs(index_desired_position));
+		osTimerStart(Thumb_FingerHandle, thumb_desired_position);
+		osTimerStart(Middle_FingerHandle, thumb_desired_position);
+		osTimerStart(Ring_FingerHandle, thumb_desired_position);
+		osTimerStart(Pinky_FingerHandle, thumb_desired_position);
 
-	    // Return to neutral position
-	    Servo_StopAll();
+	    Servo_SetMotion(THUMB, Direction_Decider(&thumb_desired_position), 10);
+	    Servo_SetMotion(INDEX, Direction_Decider(&index_desired_position), 25);
+	    Servo_SetMotion(MIDDLE, Direction_Decider(&middle_desired_position), 10);
+	    Servo_SetMotion(RING, Direction_Decider(&ring_desired_position), 10);
+	    Servo_SetMotion(PINKY, Direction_Decider(&pinky_desired_position), 10);
+
 	}
 
 	void ResetHand(void) {
@@ -1131,6 +1139,17 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 	 * @param None
 	 * @retval None
 	 */
+
+	void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+	{
+	    if (GPIO_Pin == B1_Pin) // Check it’s B1 triggering the interrupt
+	    {
+	        HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin); // Toggle LED2 as a test
+	        SignLetter('A');
+
+	    }
+	}
+
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -1146,13 +1165,47 @@ void StartDefaultTask(void *argument)
   /* Infinite loop */
 
 
-	osTimerStart(Index_FingerHandle, index_current);
-	osTimerStart(Thumb_FingerHandle, thumb_current);
-	osTimerStart(Middle_FingerHandle, thumb_current);
-	osTimerStart(Ring_FingerHandle, thumb_current);
-	osTimerStart(Pinky_FingerHandle, thumb_current);
+//	osTimerStart(Index_FingerHandle, index_current);
+//	osTimerStart(Thumb_FingerHandle, thumb_current);
+//	osTimerStart(Middle_FingerHandle, thumb_current);
+//	osTimerStart(Ring_FingerHandle, thumb_current);
+//	osTimerStart(Pinky_FingerHandle, thumb_current);
+
+	HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
 
 	SignLetter('A');
+
+//	Servo_Init();
+
+//	osTimerStart(Index_FingerHandle, 1000);
+//	osTimerStart(Thumb_FingerHandle, thumb_desired_position);
+//	osTimerStart(Middle_FingerHandle, thumb_desired_position);
+//	osTimerStart(Ring_FingerHandle, thumb_desired_position);
+//	osTimerStart(Pinky_FingerHandle, thumb_desired_position);
+//
+//	Servo_SetMotion(THUMB, Direction_Decider(&thumb_desired_position), 10);
+//	Servo_SetMotion(INDEX, Direction_Decider(&index_desired_position), 25);
+//	Servo_SetMotion(MIDDLE, Direction_Decider(&middle_desired_position), 10);
+//	Servo_SetMotion(RING, Direction_Decider(&ring_desired_position), 10);
+//	Servo_SetMotion(PINKY, Direction_Decider(&pinky_desired_position), 10);
+
+
+//	osDelay(1000);
+//
+//
+//	Servo_Init();
+//	osTimerStart(Index_FingerHandle, 2000);
+//    Servo_SetMotion(INDEX, CLOCKWISE, 25);
+
+//    osDelay(5000);
+//
+//	Servo_SetMotion(INDEX, STOP, 0);
+//    HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
+
+
+//	Servo_StopAll();
+
+
   for(;;)
   {
     osDelay(1);
@@ -1165,6 +1218,36 @@ void Index(void *argument)
 {
   /* USER CODE BEGIN Index */
 
+	HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+	Servo_SetMotion(INDEX, STOP, 0);
+    HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
+
+
+
+//	int speed = servoStates[INDEX].speed;
+//	Direction dir = servoStates[INDEX].dir;
+//
+//	if (dir == CLOCKWISE) {
+//		index_current -= speed * 100; // Tune this value based on servo speed
+//	} else if (dir == COUNTERCLOCKWISE) {
+//		index_current += speed * 100;
+//	}
+//
+//	if ((dir == CLOCKWISE && index_current <= index_desired_position) ||
+//		(dir == COUNTERCLOCKWISE && index_current >= index_desired_position)) {
+//		Servo_SetMotion(INDEX, STOP, 0);
+//		index_current = index_desired_position;
+//	}
+
+
+
+//		Servo_StopAll();
+//
+//    index_current = index_desired_position;
+//    thumb_current = thumb_desired_position;
+//	middle_current = middle_desired_position;
+//	ring_current = ring_desired_position;
+//	pinky_current = pinky_desired_position;
   /* USER CODE END Index */
 }
 
@@ -1172,7 +1255,13 @@ void Index(void *argument)
 void Thumb(void *argument)
 {
   /* USER CODE BEGIN Thumb */
+	Servo_StopAll();
 
+    index_current = index_desired_position;
+    thumb_current = thumb_desired_position;
+	middle_current = middle_desired_position;
+	ring_current = ring_desired_position;
+	pinky_current = pinky_desired_position;
   /* USER CODE END Thumb */
 }
 
@@ -1180,7 +1269,13 @@ void Thumb(void *argument)
 void Middle(void *argument)
 {
   /* USER CODE BEGIN Middle */
+	Servo_StopAll();
 
+	index_current = index_desired_position;
+    thumb_current = thumb_desired_position;
+	middle_current = middle_desired_position;
+	ring_current = ring_desired_position;
+	pinky_current = pinky_desired_position;
   /* USER CODE END Middle */
 }
 
@@ -1188,7 +1283,13 @@ void Middle(void *argument)
 void Ring(void *argument)
 {
   /* USER CODE BEGIN Ring */
+	Servo_StopAll();
 
+	index_current = index_desired_position;
+    thumb_current = thumb_desired_position;
+	middle_current = middle_desired_position;
+	ring_current = ring_desired_position;
+	pinky_current = pinky_desired_position;
   /* USER CODE END Ring */
 }
 
@@ -1196,7 +1297,13 @@ void Ring(void *argument)
 void Pinky(void *argument)
 {
   /* USER CODE BEGIN Pinky */
+	Servo_StopAll();
 
+	index_current = index_desired_position;
+    thumb_current = thumb_desired_position;
+	middle_current = middle_desired_position;
+	ring_current = ring_desired_position;
+	pinky_current = pinky_desired_position;
   /* USER CODE END Pinky */
 }
 

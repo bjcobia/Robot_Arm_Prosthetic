@@ -88,8 +88,9 @@ while True:
                 
                 # Using google to recognize audio
                 MyText = r.recognize_google(audio2)
-                MyText = MyText.lower()
-
+                MyText = MyText.Upper()
+                
+                # Check if "stop" is in the recognized text
                 if "stop" in MyText:
                     print("Stop command detected. Deactivating voice recognition.")
                     enable = False
