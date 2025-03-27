@@ -48,11 +48,11 @@
 #define SERVO_RING      TIM4, TIM_CHANNEL_1
 #define SERVO_PINKY     TIM8, TIM_CHANNEL_1
 
-#define THUMB_CLOSED 2000
-#define INDEX_CLOSED 2000
-#define MIDDLE_CLOSED 1000
-#define RING_CLOSED 2000
-#define PINKY_CLOSED 2000
+#define THUMB_CLOSED 1000		//Verified
+#define INDEX_CLOSED 1000		//Verified
+#define MIDDLE_CLOSED 1000		// Verified
+#define RING_CLOSED 1200		//Verified
+#define PINKY_CLOSED 1200		//Verified
 
 typedef enum {
     THUMB = 0,
@@ -1178,7 +1178,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
-//	Servo_Init();
+	Servo_Init();
 
 //	HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
 
@@ -1186,99 +1186,217 @@ void StartDefaultTask(void *argument)
 
 	osDelay(10);
 
-	if(thumb_desired_position !=0){
-	ServoState state1 = {100,Direction_Decider(&thumb_desired_position),0,THUMB}; // Sets motion for Thumb
-	osMessageQueuePut(servoQueueHandle, &state1, 0, 0);
+
+//	thumb_desired_position= 0;
+//	index_desired_position= 0;
+//	middle_desired_position= 0;
+//	ring_desired_position= 0;
+//	pinky_desired_position= 0;
+
+	if(thumb_desired_position < 0){
+		ServoState state1 = {100,Direction_Decider(&thumb_desired_position),0,THUMB}; // Sets motion for Thumb
+		osMessageQueuePut(servoQueueHandle, &state1, 0, 0);
 	}
-	if(index_desired_position !=0){
-	ServoState state2 = {100,Direction_Decider(&index_desired_position),0,INDEX}; // Sets motion for Index Finger
-	osMessageQueuePut(servoQueueHandle, &state2, 0, 0);
+	else if(thumb_desired_position > 0){
+		thumb_desired_position = thumb_desired_position *.15;
+		ServoState state1 = {100,Direction_Decider(&thumb_desired_position),0,THUMB}; // Sets motion for Thumb
+		osMessageQueuePut(servoQueueHandle, &state1, 0, 0);
 	}
-	if(middle_desired_position !=0){
-	ServoState state3 = {100,Direction_Decider(&middle_desired_position),0,MIDDLE}; // Sets motion for Middle Finger
-	osMessageQueuePut(servoQueueHandle, &state3, 0, 0);
+
+
+	if(index_desired_position < 0){
+		ServoState state2 = {100,Direction_Decider(&index_desired_position),0,INDEX}; // Sets motion for Index Finger
+		osMessageQueuePut(servoQueueHandle, &state2, 0, 0);
 	}
-	if(ring_desired_position !=0){
-	ServoState state4 = {100,Direction_Decider(&ring_desired_position),0,RING}; // Sets motion for Ring Finger
-	osMessageQueuePut(servoQueueHandle, &state4, 0, 0);
+	else if(index_desired_position > 0){
+		index_desired_position = index_desired_position *0.50;
+		ServoState state2 = {100,Direction_Decider(&index_desired_position),0,INDEX}; // Sets motion for Index Finger
+		osMessageQueuePut(servoQueueHandle, &state2, 0, 0);
 	}
-	if(pinky_desired_position !=0){
-	ServoState state5 = {100,Direction_Decider(&pinky_desired_position),0,PINKY}; // Sets motion for Pinky Finger0
-	osMessageQueuePut(servoQueueHandle, &state5, 0, 0);
+
+
+	if(middle_desired_position < 0){
+		ServoState state3 = {100,Direction_Decider(&middle_desired_position),0,MIDDLE}; // Sets motion for Middle Finger
+		osMessageQueuePut(servoQueueHandle, &state3, 0, 0);
 	}
+	else if(middle_desired_position > 0){
+		middle_desired_position = middle_desired_position *0.45;
+		ServoState state3 = {100,Direction_Decider(&middle_desired_position),0,MIDDLE}; // Sets motion for Index Finger
+		osMessageQueuePut(servoQueueHandle, &state3, 0, 0);
+	}
+
+
+	if(ring_desired_position < 0){
+		ServoState state4 = {100,Direction_Decider(&ring_desired_position),0,RING}; // Sets motion for Ring Finger
+		osMessageQueuePut(servoQueueHandle, &state4, 0, 0);
+	}
+	else if(ring_desired_position > 0){
+		ring_desired_position = ring_desired_position *0.5;
+		ServoState state4 = {100,Direction_Decider(&ring_desired_position),0,RING}; // Sets motion for Index Finger
+		osMessageQueuePut(servoQueueHandle, &state4, 0, 0);
+	}
+
+
+	if(pinky_desired_position < 0){
+		ServoState state5 = {100,Direction_Decider(&pinky_desired_position),0,PINKY}; // Sets motion for Pinky Finger0
+		osMessageQueuePut(servoQueueHandle, &state5, 0, 0);
+	}
+	else if(pinky_desired_position > 0){
+		pinky_desired_position = pinky_desired_position *0.40;
+		ServoState state5 = {100,Direction_Decider(&pinky_desired_position),0,PINKY}; // Sets motion for Index Finger
+		osMessageQueuePut(servoQueueHandle, &state5, 0, 0);
+	}
+
+
 
 	if(index_desired_position !=0){
-	osTimerStart(Index_FingerHandle, abs(index_desired_position));
+		osTimerStart(Index_FingerHandle, abs(index_desired_position));
 	}
 	if(thumb_desired_position !=0){
-	osTimerStart(Thumb_FingerHandle, abs(thumb_desired_position));
+		osTimerStart(Thumb_FingerHandle, abs(thumb_desired_position));
 	}
 	if(middle_desired_position !=0){
-	osTimerStart(Middle_FingerHandle, abs(middle_desired_position));
+		osTimerStart(Middle_FingerHandle, abs(middle_desired_position));
 	}
 	if(ring_desired_position !=0){
-	osTimerStart(Ring_FingerHandle, abs(ring_desired_position));
+		osTimerStart(Ring_FingerHandle, abs(ring_desired_position));
 	}
 	if(pinky_desired_position !=0){
-	osTimerStart(Pinky_FingerHandle, abs(pinky_desired_position));
+		osTimerStart(Pinky_FingerHandle, abs(pinky_desired_position));
 	}
 
-	osDelay(5000);
-
-	SignLetter('B');
-
-	if(thumb_desired_position !=0){
-	ServoState state1 = {100,Direction_Decider(&thumb_desired_position),0,THUMB}; // Sets motion for Thumb
-	osMessageQueuePut(servoQueueHandle, &state1, 0, 0);
-	}
-	if(index_desired_position !=0){
-	ServoState state2 = {100,Direction_Decider(&index_desired_position),0,INDEX}; // Sets motion for Index Finger
-	osMessageQueuePut(servoQueueHandle, &state2, 0, 0);
-	}
-	if(middle_desired_position !=0){
-	ServoState state3 = {100,Direction_Decider(&middle_desired_position),0,MIDDLE}; // Sets motion for Middle Finger
-	osMessageQueuePut(servoQueueHandle, &state3, 0, 0);
-	}
-	if(ring_desired_position !=0){
-	ServoState state4 = {100,Direction_Decider(&ring_desired_position),0,RING}; // Sets motion for Ring Finger
-	osMessageQueuePut(servoQueueHandle, &state4, 0, 0);
-	}
-	if(pinky_desired_position !=0){
-	ServoState state5 = {100,Direction_Decider(&pinky_desired_position),0,PINKY}; // Sets motion for Pinky Finger0
-	osMessageQueuePut(servoQueueHandle, &state5, 0, 0);
-	}
-
-	if(index_desired_position !=0){
-	osTimerStart(Index_FingerHandle, abs(index_desired_position));
-	}
-	if(thumb_desired_position !=0){
-	osTimerStart(Thumb_FingerHandle, abs(thumb_desired_position));
-	}
-	if(middle_desired_position !=0){
-	osTimerStart(Middle_FingerHandle, abs(middle_desired_position));
-	}
-	if(ring_desired_position !=0){
-	osTimerStart(Ring_FingerHandle, abs(ring_desired_position));
-	}
-	if(pinky_desired_position !=0){
-	osTimerStart(Pinky_FingerHandle, abs(pinky_desired_position));
-	}
+//	osDelay(5000);
+//
+//	SignLetter('B');
+//
+//	if(thumb_desired_position !=0){
+//	ServoState state1 = {100,Direction_Decider(&thumb_desired_position),0,THUMB}; // Sets motion for Thumb
+//	osMessageQueuePut(servoQueueHandle, &state1, 0, 0);
+//	}
+//	if(index_desired_position !=0){
+//	ServoState state2 = {100,Direction_Decider(&index_desired_position),0,INDEX}; // Sets motion for Index Finger
+//	osMessageQueuePut(servoQueueHandle, &state2, 0, 0);
+//	}
+//	if(middle_desired_position !=0){
+//	ServoState state3 = {100,Direction_Decider(&middle_desired_position),0,MIDDLE}; // Sets motion for Middle Finger
+//	osMessageQueuePut(servoQueueHandle, &state3, 0, 0);
+//	}
+//	if(ring_desired_position !=0){
+//	ServoState state4 = {100,Direction_Decider(&ring_desired_position),0,RING}; // Sets motion for Ring Finger
+//	osMessageQueuePut(servoQueueHandle, &state4, 0, 0);
+//	}
+//	if(pinky_desired_position !=0){
+//	ServoState state5 = {100,Direction_Decider(&pinky_desired_position),0,PINKY}; // Sets motion for Pinky Finger0
+//	osMessageQueuePut(servoQueueHandle, &state5, 0, 0);
+//	}
+//
+//	if(index_desired_position !=0){
+//	osTimerStart(Index_FingerHandle, abs(index_desired_position));
+//	}
+//	if(thumb_desired_position !=0){
+//	osTimerStart(Thumb_FingerHandle, abs(thumb_desired_position));
+//	}
+//	if(middle_desired_position !=0){
+//	osTimerStart(Middle_FingerHandle, abs(middle_desired_position));
+//	}
+//	if(ring_desired_position !=0){
+//	osTimerStart(Ring_FingerHandle, abs(ring_desired_position));
+//	}
+//	if(pinky_desired_position !=0){
+//	osTimerStart(Pinky_FingerHandle, abs(pinky_desired_position));
+//	}
 	/* Infinite loop to keep it in the task */
   for(;;)
   {
 
-	if (IsButtonPressed() && messageReady)
+	if (IsButtonPressed())
 	  {
 		/* Process the message when button is pressed and message is available */
-		ProcessReceivedMessage(message);
 
-		/* Reset message buffer */
-		messageIndex = 0;
-		messageReady = 0;
-		memset(message, 0, sizeof(message));
+		SignLetter('0');
 
-		/* Debounce */
-		HAL_Delay(200);
+		if(thumb_desired_position < 0){
+			ServoState state1 = {100,Direction_Decider(&thumb_desired_position),0,THUMB}; // Sets motion for Thumb
+			osMessageQueuePut(servoQueueHandle, &state1, 0, 0);
+		}
+		else if(thumb_desired_position > 0){
+			thumb_desired_position = thumb_desired_position *.15;
+			ServoState state1 = {100,Direction_Decider(&thumb_desired_position),0,THUMB}; // Sets motion for Thumb
+			osMessageQueuePut(servoQueueHandle, &state1, 0, 0);
+		}
+
+
+		if(index_desired_position < 0){
+			ServoState state2 = {100,Direction_Decider(&index_desired_position),0,INDEX}; // Sets motion for Index Finger
+			osMessageQueuePut(servoQueueHandle, &state2, 0, 0);
+		}
+		else if(index_desired_position > 0){
+			index_desired_position = index_desired_position *0.50;
+			ServoState state2 = {100,Direction_Decider(&index_desired_position),0,INDEX}; // Sets motion for Index Finger
+			osMessageQueuePut(servoQueueHandle, &state2, 0, 0);
+		}
+
+
+		if(middle_desired_position < 0){
+			ServoState state3 = {100,Direction_Decider(&middle_desired_position),0,MIDDLE}; // Sets motion for Middle Finger
+			osMessageQueuePut(servoQueueHandle, &state3, 0, 0);
+		}
+		else if(middle_desired_position > 0){
+			middle_desired_position = middle_desired_position *0.45;
+			ServoState state3 = {100,Direction_Decider(&middle_desired_position),0,MIDDLE}; // Sets motion for Index Finger
+			osMessageQueuePut(servoQueueHandle, &state3, 0, 0);
+		}
+
+
+		if(ring_desired_position < 0){
+			ServoState state4 = {100,Direction_Decider(&ring_desired_position),0,RING}; // Sets motion for Ring Finger
+			osMessageQueuePut(servoQueueHandle, &state4, 0, 0);
+		}
+		else if(ring_desired_position > 0){
+			ring_desired_position = ring_desired_position *0.5;
+			ServoState state4 = {100,Direction_Decider(&ring_desired_position),0,RING}; // Sets motion for Index Finger
+			osMessageQueuePut(servoQueueHandle, &state4, 0, 0);
+		}
+
+
+		if(pinky_desired_position < 0){
+			ServoState state5 = {100,Direction_Decider(&pinky_desired_position),0,PINKY}; // Sets motion for Pinky Finger0
+			osMessageQueuePut(servoQueueHandle, &state5, 0, 0);
+		}
+		else if(pinky_desired_position > 0){
+			pinky_desired_position = pinky_desired_position *0.40;
+			ServoState state5 = {100,Direction_Decider(&pinky_desired_position),0,PINKY}; // Sets motion for Index Finger
+			osMessageQueuePut(servoQueueHandle, &state5, 0, 0);
+		}
+
+
+
+		if(index_desired_position !=0){
+			osTimerStart(Index_FingerHandle, abs(index_desired_position));
+		}
+		if(thumb_desired_position !=0){
+			osTimerStart(Thumb_FingerHandle, abs(thumb_desired_position));
+		}
+		if(middle_desired_position !=0){
+			osTimerStart(Middle_FingerHandle, abs(middle_desired_position));
+		}
+		if(ring_desired_position !=0){
+			osTimerStart(Ring_FingerHandle, abs(ring_desired_position));
+		}
+		if(pinky_desired_position !=0){
+			osTimerStart(Pinky_FingerHandle, abs(pinky_desired_position));
+		}
+
+
+//		ProcessReceivedMessage(message);
+//
+//		/* Reset message buffer */
+//		messageIndex = 0;
+//		messageReady = 0;
+//		memset(message, 0, sizeof(message));
+//
+//		/* Debounce */
+//		HAL_Delay(200);
 	  }
 	  osDelay(100);
   }
