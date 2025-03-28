@@ -25,7 +25,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "timers.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -48,11 +47,11 @@
 #define SERVO_RING      TIM4, TIM_CHANNEL_1
 #define SERVO_PINKY     TIM8, TIM_CHANNEL_1
 
-#define THUMB_CLOSED 1000		//Verified
-#define INDEX_CLOSED 1000		//Verified
-#define MIDDLE_CLOSED 1000		// Verified
-#define RING_CLOSED 1200		//Verified
-#define PINKY_CLOSED 1200		//Verified
+#define THUMB_CLOSED 1000
+#define INDEX_CLOSED 1000
+#define MIDDLE_CLOSED 1000
+#define RING_CLOSED 1000
+#define PINKY_CLOSED 1000
 
 typedef enum {
     THUMB = 0,
@@ -73,7 +72,6 @@ typedef struct {
     int speed;          // Speed percentage (0-100)
     Direction dir;      // Current direction
     uint32_t pulse;     // Current pulse width
-    Finger finger;		// Current finger being modified
 } ServoState;
 
 /* USER CODE END PD */
@@ -124,16 +122,7 @@ osTimerId_t Pinky_FingerHandle;
 const osTimerAttr_t Pinky_Finger_attributes = {
   .name = "Pinky_Finger"
 };
-
 /* USER CODE BEGIN PV */
-osMessageQueueId_t servoQueueHandle;
-osThreadId_t Servo_SetMotionHandle;
-const osThreadAttr_t Servo_SetMotion_attributes = {
-    .name = "Servo_SetMotion",
-    .stack_size = 128 * 4, // 512 bytes, adjust if needed
-    .priority = (osPriority_t) osPriorityNormal
-};
-
 char rxBuffer[1]; /* Buffer for receiving a single character */
 char message[256]; /* Buffer to store the complete message */
 uint16_t messageIndex = 0;
@@ -141,11 +130,11 @@ uint8_t messageReady = 0; /* Flag to indicate a message is in buffer waiting to 
 
 /* Global servo states */
 ServoState servoStates[5] = {
-    {0, STOP, SERVO_STOP, THUMB},  // THUMB
-    {0, STOP, SERVO_STOP, INDEX},  // INDEX
-    {0, STOP, SERVO_STOP, MIDDLE},  // MIDDLE
-    {0, STOP, SERVO_STOP, RING},  // RING
-    {0, STOP, SERVO_STOP, PINKY}   // PINKY
+    {0, STOP, SERVO_STOP},  // THUMB
+    {0, STOP, SERVO_STOP},  // INDEX
+    {0, STOP, SERVO_STOP},  // MIDDLE
+    {0, STOP, SERVO_STOP},  // RING
+    {0, STOP, SERVO_STOP}   // PINKY
 };
 
 /* USER CODE END PV */
@@ -169,11 +158,10 @@ void Pinky(void *argument);
 /* USER CODE BEGIN PFP */
 
 void Servo_Init(void);
+void Servo_SetMotion(Finger finger, Direction direction, int speed);
 void Servo_StopAll(void);
 void SignLetter(char letter);
 int Direction_Decider(int* Desired_Position);
-void Servo_SetMotion(void *argument);
-
 
 static void MX_USART2_UART_Init(void);
 void ProcessReceivedMessage(char* msg);
@@ -190,6 +178,13 @@ int index_desired_position;
 int middle_desired_position;
 int ring_desired_position;
 int pinky_desired_position;
+//
+//int *ptr_thumb = &thumb_desired_position;
+//int *ptr_index = &index_desired_position;
+//int *ptr_middle;
+//int *ptr_ring;
+//int *ptr_pinky;
+
 
 /* USER CODE END PFP */
 
@@ -233,13 +228,28 @@ int main(void)
   MX_TIM1_Init();
   MX_TIM4_Init();
   MX_TIM8_Init();
-
-
   /* USER CODE BEGIN 2 */
+//  SignLetter('B', 2000);
+//
+//  HAL_Delay(2000);
+//
+//  memset(message, 0, sizeof(message));
+//  HAL_UART_Receive_IT(&huart2, (uint8_t*)rxBuffer, 1);
+
+  SignLetter('A');
+//
+//  HAL_Delay(2000);
+//
+//  Servo_StopAll();
+//
+//  HAL_Delay(3000);
+//
+//  SignLetter('B', 1000);
+//
+//  SignLetter('A', 2000);
+
 
   /* USER CODE END 2 */
-
-
 
   /* Init scheduler */
   osKernelInitialize();
@@ -257,16 +267,16 @@ int main(void)
   Index_FingerHandle = osTimerNew(Index, osTimerOnce, NULL, &Index_Finger_attributes);
 
   /* creation of Thumb_Finger */
-  Thumb_FingerHandle = osTimerNew(Thumb, osTimerOnce, NULL, &Thumb_Finger_attributes);
+  Thumb_FingerHandle = osTimerNew(Thumb, osTimerPeriodic, NULL, &Thumb_Finger_attributes);
 
   /* creation of Middle_Finger */
-  Middle_FingerHandle = osTimerNew(Middle, osTimerOnce, NULL, &Middle_Finger_attributes);
+  Middle_FingerHandle = osTimerNew(Middle, osTimerPeriodic, NULL, &Middle_Finger_attributes);
 
   /* creation of Ring_Finger */
-  Ring_FingerHandle = osTimerNew(Ring, osTimerOnce, NULL, &Ring_Finger_attributes);
+  Ring_FingerHandle = osTimerNew(Ring, osTimerPeriodic, NULL, &Ring_Finger_attributes);
 
   /* creation of Pinky_Finger */
-  Pinky_FingerHandle = osTimerNew(Pinky, osTimerOnce, NULL, &Pinky_Finger_attributes);
+  Pinky_FingerHandle = osTimerNew(Pinky, osTimerPeriodic, NULL, &Pinky_Finger_attributes);
 
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
@@ -274,8 +284,6 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
-  servoQueueHandle = osMessageQueueNew(5,sizeof(ServoState), NULL);
-
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -284,7 +292,6 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
-  Servo_SetMotionHandle = osThreadNew(Servo_SetMotion, NULL, &Servo_SetMotion_attributes);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -300,7 +307,20 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    /* USER CODE END WHILE */
+//	if (IsButtonPressed() && messageReady)
+//	  {
+//		/* Process the message when button is pressed and message is available */
+//		ProcessReceivedMessage(message);
+//
+//		/* Reset message buffer */
+//		messageIndex = 0;
+//		messageReady = 0;
+//		memset(message, 0, sizeof(message));
+//
+//		/* Debounce */
+//		HAL_Delay(200);
+//	  }
+//    /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
   }
@@ -712,21 +732,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
-  /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
-  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
-
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
   /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
-
-/* Make everything a part of the default task */
-
-
-
 
 
 /* Button press detection function - modify for your specific board */
@@ -737,7 +748,7 @@ uint8_t IsButtonPressed(void)
 
   if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13) == GPIO_PIN_RESET)
   {
-	return 1; /* Button pressed */
+    return 1; /* Button pressed */
   }
   return 0; /* Button not pressed */
 }
@@ -747,28 +758,28 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
   if (huart->Instance == USART2) /* Change to match your UART instance */
   {
-	/* Silently add character to message buffer (no echo) */
-	if (messageIndex < sizeof(message) - 1) /* Leave space for null terminator */
-	{
-	  message[messageIndex++] = rxBuffer[0];
-	  message[messageIndex] = '\0'; /* Always keep null-terminated */
+    /* Silently add character to message buffer (no echo) */
+    if (messageIndex < sizeof(message) - 1) /* Leave space for null terminator */
+    {
+      message[messageIndex++] = rxBuffer[0];
+      message[messageIndex] = '\0'; /* Always keep null-terminated */
 
-	  /* Set flag indicating we have data ready to process */
-	  messageReady = 1;
-	}
-	else
-	{
-	  /* Buffer overflow, reset */
-	  messageIndex = 0;
-	  memset(message, 0, sizeof(message));
+      /* Set flag indicating we have data ready to process */
+      messageReady = 1;
+    }
+    else
+    {
+      /* Buffer overflow, reset */
+      messageIndex = 0;
+      memset(message, 0, sizeof(message));
 
-	  /* Consider sending an overflow message */
-	  char overflowMsg[] = "Buffer overflow! Message cleared.\r\n";
-	  HAL_UART_Transmit(&huart2, (uint8_t*)overflowMsg, strlen(overflowMsg), 1000);
-	}
+      /* Consider sending an overflow message */
+      char overflowMsg[] = "Buffer overflow! Message cleared.\r\n";
+      HAL_UART_Transmit(&huart2, (uint8_t*)overflowMsg, strlen(overflowMsg), 1000);
+    }
 
-	/* Start the next reception */
-	HAL_UART_Receive_IT(huart, (uint8_t*)rxBuffer, 1);
+    /* Start the next reception */
+    HAL_UART_Receive_IT(huart, (uint8_t*)rxBuffer, 1);
   }
 }
 
@@ -789,7 +800,6 @@ void ProcessReceivedMessage(char* msg)
   /* Optional: Notify completion */
   char completeMsg[] = "Message echo complete\r\n";
   HAL_UART_Transmit(&huart2, (uint8_t*)completeMsg, strlen(completeMsg), 1000);
-
 }
 
 
@@ -800,372 +810,328 @@ void ProcessReceivedMessage(char* msg)
  * @param speed: Speed percentage (0-100)
  * @retval None
  */
+void Servo_SetMotion(Finger finger, Direction direction, int speed) {
+    uint32_t pulse;
 
-void Servo_SetMotion(void *argument) {
-    (void)argument;
-    ServoState newState;
+    // Clamp speed to 0-100%
+    if (speed < 0) speed = 0;
+    if (speed > 100) speed = 100;
 
-    for (;;) {
-        // Wait for new state from the queue
-        if (osMessageQueueGet(servoQueueHandle, &newState, NULL, osWaitForever) == osOK) {
-            uint32_t pulse;
-
-            // Clamp speed to 0-100%
-            if (newState.speed < 0) newState.speed = 0;
-            if (newState.speed > 100) newState.speed = 100;
-
-            // Calculate pulse width based on direction and speed
-            if (newState.dir == STOP) {
-                pulse = SERVO_STOP;
-            } else if (newState.dir == CLOCKWISE) { // CLOCKWISE
-                pulse = SERVO_STOP - ((SERVO_STOP - SERVO_MAX_CW) * newState.speed / 100);
-            } else { // DIRECTION_DOWN (COUNTERCLOCKWISE)
-                pulse = SERVO_STOP + ((SERVO_MAX_CCW - SERVO_STOP) * newState.speed / 100);
-            }
-
-            // Update servo state with calculated pulse
-            servoStates[newState.finger].speed = newState.speed;
-            servoStates[newState.finger].dir = newState.dir;
-            servoStates[newState.finger].pulse = pulse;
-            servoStates[newState.finger].finger = newState.finger; // Redundant but kept for consistency
-
-            // Apply pulse width to the appropriate timer
-            switch (newState.finger) {
-                case THUMB:
-                    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, pulse);
-                    break;
-                case INDEX:
-                    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, pulse);
-                    break;
-                case MIDDLE:
-                    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, pulse);
-                    break;
-                case RING:
-                    __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, pulse);
-                    break;
-                case PINKY:
-                    __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_1, pulse);
-                    break;
-            }
-        }
-        osDelay(10);
+    // Calculate pulse width based on direction and speed
+    if (direction == STOP) {
+        pulse = SERVO_STOP;
+    } else if (direction == CLOCKWISE) {
+        // Map 0-100% to SERVO_STOP-SERVO_MAX_CW
+        pulse = SERVO_STOP - ((SERVO_STOP - SERVO_MAX_CW) * speed / 100);
+    } else { // COUNTERCLOCKWISE
+        // Map 0-100% to SERVO_STOP-SERVO_MAX_CCW
+        pulse = SERVO_STOP + ((SERVO_MAX_CCW - SERVO_STOP) * speed / 100);
     }
-}
 
-/**
- * @brief Stops all servos
- * @param None
- * @retval None
- */
-void Servo_StopAll(void) {
-	ServoState state1 = {0,STOP,0,INDEX}; // Stops Index Finger
-	osMessageQueuePut(servoQueueHandle, &state1, 0, 0);
+    // Update servo state
+    servoStates[finger].speed = speed;
+    servoStates[finger].dir = direction;
+    servoStates[finger].pulse = pulse;
 
-	ServoState state2 = {0,STOP,0,THUMB}; // Stops Thumb
-	osMessageQueuePut(servoQueueHandle, &state2, 0, 0);
-
-	ServoState state3 = {0,STOP,0,MIDDLE}; // Stops Middle Finger
-	osMessageQueuePut(servoQueueHandle, &state3, 0, 0);
-
-	ServoState state4 = {0,STOP,0,RING}; // Stops Ring Finger
-	osMessageQueuePut(servoQueueHandle, &state4, 0, 0);
-
-	ServoState state5 = {0,STOP,0,PINKY}; // Stops Pinky Finger
-	osMessageQueuePut(servoQueueHandle, &state5, 0, 0);
-
-	HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
-	HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
-	HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_1);
-	HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_1);
-	HAL_TIM_PWM_Stop(&htim8, TIM_CHANNEL_1);
-}
-
-/**
- * @brief Initialize all servo timers and start PWM
- * @param None
- * @retval None
- */
-void Servo_Init(void) {
-	// Start all PWM channels
-	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
-	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
-	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
-	HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_1);
-}
-
-int Direction_Decider(int* Desired_Position){
-	if(*Desired_Position < 0){
-		*Desired_Position = *Desired_Position * -1;
-		return CLOCKWISE;
+    // Apply pulse width to the appropriate timer
+    switch (finger) {
+        case THUMB:
+            __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, pulse);
+            break;
+        case INDEX:
+            __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, pulse);
+            break;
+        case MIDDLE:
+            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, pulse);
+            break;
+        case RING:
+            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, pulse);
+            break;
+        case PINKY:
+            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_1, pulse);
+            break;
+    }
 	}
-	else{
-		return COUNTERCLOCKWISE;
+
+	/**
+	 * @brief Stops all servos
+	 * @param None
+	 * @retval None
+	 */
+	void Servo_StopAll(void) {
+		Servo_SetMotion(THUMB, STOP, 0);
+		Servo_SetMotion(INDEX, STOP, 0);
+		Servo_SetMotion(MIDDLE, STOP, 0);
+		Servo_SetMotion(RING, STOP, 0);
+		Servo_SetMotion(PINKY, STOP, 0);
+
+	    HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
+	    HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
+	    HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_1);
+	    HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_1);
+	    HAL_TIM_PWM_Stop(&htim8, TIM_CHANNEL_1);
 	}
-}
 
-/**
- * @brief Example function to demonstrate a sign language letter
- * @param letter: ASCII character (A-Z)
- * @param duration: How long to hold the position (in ms)
- * @retval None
- */
-void SignLetter(char letter) {
+	/**
+	 * @brief Initialize all servo timers and start PWM
+	 * @param None
+	 * @retval None
+	 */
+	void Servo_Init(void) {
+	    // Start all PWM channels
+	    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+	    HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+	    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+	    HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
+	    HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_1);
 
-	Servo_Init();
-	// Set finger positions based on the letter
-	switch(letter) {
-	 case 'A':
-		thumb_desired_position = thumb_current - 0.25 * THUMB_CLOSED;
-		index_desired_position = index_current - 1 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 1 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
-		break;
+//	    // Initialize all servos to stop position
+//	    Servo_StopAll();
+	}
 
-	 case 'B':
-		thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
-		index_desired_position = index_current - 0 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 0 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 0 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 0 * PINKY_CLOSED;
-
-		if(middle_desired_position == 1000){
-			HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+	int Direction_Decider(int* Desired_Position){
+		if(*Desired_Position < 0){
+			*Desired_Position = *Desired_Position * -1;
+			return CLOCKWISE;
 		}
-
-		break;
-
-	case 'C':
-		thumb_desired_position = thumb_current - 0.25 * THUMB_CLOSED;
-		index_desired_position = index_current - 0.5 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 0.5 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 0.5 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 0.5 * PINKY_CLOSED;
-		break;
-
-	case 'D':
-		thumb_desired_position = thumb_current - 0.5 * THUMB_CLOSED;
-		index_desired_position = index_current - 0 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 0.75 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 0.75 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 0.75 * PINKY_CLOSED;
-
-	case 'E':
-		thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
-		index_desired_position = index_current - 0.75 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 0.75 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 0.75 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 0.75 * PINKY_CLOSED;
-		break;
-
-	case 'F':
-		thumb_desired_position = thumb_current - 0.25 * THUMB_CLOSED;
-		index_desired_position = index_current - 0.75 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 0 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 0 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 0 * PINKY_CLOSED;
-		break;
-
-	case 'G':
-		thumb_desired_position = thumb_current - 0.5 * THUMB_CLOSED;
-		index_desired_position = index_current - 0 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 1 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
-		break;
-
-	case 'H':
-		thumb_desired_position = thumb_current - 0.75 * THUMB_CLOSED;
-		index_desired_position = index_current - 0 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 0 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 1 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
-		break;
-
-	case 'I':
-		thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
-		index_desired_position = index_current - 1 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 1 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 0 * PINKY_CLOSED;
-		break;
-
-	case 'J':
-		thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
-		index_desired_position = index_current - 1 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 1 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 0 * PINKY_CLOSED;
-		break;
-
-	case 'K':
-		thumb_desired_position = thumb_current - 0.25 * THUMB_CLOSED;
-		index_desired_position = index_current - 0 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 0 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 1 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
-		break;
-
-	case 'L':
-		thumb_desired_position = thumb_current - 0 * THUMB_CLOSED;
-		index_desired_position = index_current - 0 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 1 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
-		break;
-
-	case 'M':
-		thumb_desired_position = thumb_current - 1 * THUMB_CLOSED; //Make speed faster so thumb closes first or the speed of the other 4 fingers slower.
-		index_desired_position = index_current - 0.9 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 0.9 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 0.9 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
-		break;
-
-	case 'N':
-		thumb_desired_position = thumb_current - 1 * THUMB_CLOSED; //Also change the speeds on this one
-		index_desired_position = index_current - 0.9 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 0.9 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 1 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
-		break;
-
-	case 'O':
-		thumb_desired_position = thumb_current - 0.25 * THUMB_CLOSED;
-		index_desired_position = index_current - 0.5 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 0.5 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 0.5 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 0.5 * PINKY_CLOSED;
-		break;
-
-	case 'P':
-		thumb_desired_position = thumb_current - 0.25 * THUMB_CLOSED;
-		index_desired_position = index_current - 0.25 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 0.5 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 1 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
-		break;
-
-	case 'Q':
-		thumb_desired_position = thumb_current - 0.1 * THUMB_CLOSED;
-		index_desired_position = index_current - 0.3 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 1 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
-		break;
-
-	case 'R':
-		thumb_desired_position = thumb_current - 1 * THUMB_CLOSED; //TBD
-		index_desired_position = index_current - 1 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 1 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
-		break;
-
-	case 'S':
-		thumb_desired_position = thumb_current - 0.8 * THUMB_CLOSED;//Make thumb slower so it ends on top of the other fingers
-		index_desired_position = index_current - 1 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 1 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
-		break;
-
-	case 'T':
-		thumb_desired_position = thumb_current - 1 * THUMB_CLOSED; //TBD
-		index_desired_position = index_current - 1 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 1 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
-		break;
-
-	case 'U':
-		thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
-		index_desired_position = index_current - 0 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 0 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 1 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
-		break;
-
-	case 'V':
-		thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
-		index_desired_position = index_current - 0 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 0 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 1 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
-		break;
-
-	case 'W':
-		thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
-		index_desired_position = index_current - 0 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 0 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 0 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
-		break;
-
-	case 'X':
-		thumb_desired_position = thumb_current - 0.5 * THUMB_CLOSED;
-		index_desired_position = index_current - 0.25 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 0.75 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 0.9 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 0.9 * PINKY_CLOSED;
-		break;
-
-	case 'Y':
-		thumb_desired_position = thumb_current - 0 * THUMB_CLOSED;
-		index_desired_position = index_current - 1 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 1 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 0 * PINKY_CLOSED;
-		break;
-
-	case 'Z':
-		thumb_desired_position = thumb_current - 1 * THUMB_CLOSED; //TDB
-		index_desired_position = index_current - 1 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 1 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
-		break;
-
-	case '0':
-		thumb_desired_position = thumb_current - 0 * THUMB_CLOSED;
-		index_desired_position = index_current - 0 * INDEX_CLOSED;
-		middle_desired_position = middle_current - 0 * MIDDLE_CLOSED;
-		ring_desired_position = ring_current - 0 * RING_CLOSED;
-		pinky_desired_position = pinky_current - 0 * PINKY_CLOSED;
-		break;
-
-	default:
-	   // Default position (rest)
-	   Servo_StopAll();
-	   break;
+		else{
+			return COUNTERCLOCKWISE;
+		}
 	}
-}
 
-void ResetHand(void) {
-	// Make sure PWM is active
-	Servo_Init();
+	/**
+	 * @brief Example function to demonstrate a sign language letter
+	 * @param letter: ASCII character (A-Z)
+	 * @param duration: How long to hold the position (in ms)
+	 * @retval None
+	 */
+	void SignLetter(char letter) {
+	    // Reset to neutral position
+	    Servo_Init();
 
-}
 
+	    // Set finger positions based on the letter
+	    switch(letter) {
+	        case 'A':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+	            break;
 
-/**
- * @brief Initialize all servo timers and start PWM
- * @param None
- * @retval None
- */
+	        case 'B':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+	            break;
 
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
-{
-	if (GPIO_Pin == B1_Pin) // Check it’s B1 triggering the interrupt
-	{
-		HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin); // Toggle LED2 as a test
-		SignLetter('A');
+	        case 'C':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
 
+	        case 'D':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+
+	        case 'E':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+
+	        case 'F':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+
+	        case 'G':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+
+	        case 'H':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+
+	        case 'I':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+
+	        case 'J':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+
+	        case 'K':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+
+	        case 'L':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+
+	        case 'M':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+
+	        case 'N':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+
+	        case 'O':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+
+	        case 'P':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+
+	        case 'Q':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+
+	        case 'R':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+
+	        case 'S':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+
+	        case 'T':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+
+	        case 'U':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+
+	        case 'V':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+
+	        case 'W':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+
+	        case 'X':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+
+	        case 'Y':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+
+	        case 'Z':
+	        	thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+	        	index_desired_position = index_current - 1 * INDEX_CLOSED;
+				middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+				ring_desired_position = ring_current - 1 * RING_CLOSED;
+			    pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+
+	        default:
+	            // Default position (rest)
+	            Servo_StopAll();
+	            break;
+	    }
+
+	    Servo_SetMotion(THUMB, Direction_Decider(&thumb_desired_position), 100);
+	    Servo_SetMotion(INDEX, Direction_Decider(&index_desired_position), 100);
+	    Servo_SetMotion(MIDDLE, Direction_Decider(&middle_desired_position), 100);
+	    Servo_SetMotion(RING, Direction_Decider(&ring_desired_position), 100);
+	    Servo_SetMotion(PINKY, Direction_Decider(&pinky_desired_position), 100);
+
+	    // Return to neutral position
+//	    Servo_StopAll();
 	}
-}
+
+	void ResetHand(void) {
+	    // Make sure PWM is active
+	    Servo_Init();
+
+	    Servo_SetMotion(THUMB, COUNTERCLOCKWISE, 60);
+	    Servo_SetMotion(INDEX, CLOCKWISE, 80);
+	    Servo_SetMotion(MIDDLE, CLOCKWISE, 80);
+	    Servo_SetMotion(RING, CLOCKWISE, 80);
+	    Servo_SetMotion(PINKY, CLOCKWISE, 80);
+
+	    // Give servos time to reach position
+	    HAL_Delay(2000);
+	}
 
 
+	/**
+	 * @brief Initialize all servo timers and start PWM
+	 * @param None
+	 * @retval None
+	 */
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -1178,227 +1144,19 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
-	Servo_Init();
-
-//	HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+  /* Infinite loop */
 
 	SignLetter('A');
 
-	osDelay(10);
+	osTimerStart(Index_FingerHandle, abs(index_desired_position));
+	osTimerStart(Thumb_FingerHandle, abs(thumb_desired_position));
+	osTimerStart(Middle_FingerHandle, abs(middle_desired_position));
+	osTimerStart(Ring_FingerHandle, abs(ring_desired_position));
+	osTimerStart(Pinky_FingerHandle, abs(pinky_desired_position));
 
-
-//	thumb_desired_position= 0;
-//	index_desired_position= 0;
-//	middle_desired_position= 0;
-//	ring_desired_position= 0;
-//	pinky_desired_position= 0;
-
-	if(thumb_desired_position < 0){
-		ServoState state1 = {100,Direction_Decider(&thumb_desired_position),0,THUMB}; // Sets motion for Thumb
-		osMessageQueuePut(servoQueueHandle, &state1, 0, 0);
-	}
-	else if(thumb_desired_position > 0){
-		thumb_desired_position = thumb_desired_position *.15;
-		ServoState state1 = {100,Direction_Decider(&thumb_desired_position),0,THUMB}; // Sets motion for Thumb
-		osMessageQueuePut(servoQueueHandle, &state1, 0, 0);
-	}
-
-
-	if(index_desired_position < 0){
-		ServoState state2 = {100,Direction_Decider(&index_desired_position),0,INDEX}; // Sets motion for Index Finger
-		osMessageQueuePut(servoQueueHandle, &state2, 0, 0);
-	}
-	else if(index_desired_position > 0){
-		index_desired_position = index_desired_position *0.50;
-		ServoState state2 = {100,Direction_Decider(&index_desired_position),0,INDEX}; // Sets motion for Index Finger
-		osMessageQueuePut(servoQueueHandle, &state2, 0, 0);
-	}
-
-
-	if(middle_desired_position < 0){
-		ServoState state3 = {100,Direction_Decider(&middle_desired_position),0,MIDDLE}; // Sets motion for Middle Finger
-		osMessageQueuePut(servoQueueHandle, &state3, 0, 0);
-	}
-	else if(middle_desired_position > 0){
-		middle_desired_position = middle_desired_position *0.45;
-		ServoState state3 = {100,Direction_Decider(&middle_desired_position),0,MIDDLE}; // Sets motion for Index Finger
-		osMessageQueuePut(servoQueueHandle, &state3, 0, 0);
-	}
-
-
-	if(ring_desired_position < 0){
-		ServoState state4 = {100,Direction_Decider(&ring_desired_position),0,RING}; // Sets motion for Ring Finger
-		osMessageQueuePut(servoQueueHandle, &state4, 0, 0);
-	}
-	else if(ring_desired_position > 0){
-		ring_desired_position = ring_desired_position *0.5;
-		ServoState state4 = {100,Direction_Decider(&ring_desired_position),0,RING}; // Sets motion for Index Finger
-		osMessageQueuePut(servoQueueHandle, &state4, 0, 0);
-	}
-
-
-	if(pinky_desired_position < 0){
-		ServoState state5 = {100,Direction_Decider(&pinky_desired_position),0,PINKY}; // Sets motion for Pinky Finger0
-		osMessageQueuePut(servoQueueHandle, &state5, 0, 0);
-	}
-	else if(pinky_desired_position > 0){
-		pinky_desired_position = pinky_desired_position *0.40;
-		ServoState state5 = {100,Direction_Decider(&pinky_desired_position),0,PINKY}; // Sets motion for Index Finger
-		osMessageQueuePut(servoQueueHandle, &state5, 0, 0);
-	}
-
-
-
-	if(index_desired_position !=0){
-		osTimerStart(Index_FingerHandle, abs(index_desired_position));
-	}
-	if(thumb_desired_position !=0){
-		osTimerStart(Thumb_FingerHandle, abs(thumb_desired_position));
-	}
-	if(middle_desired_position !=0){
-		osTimerStart(Middle_FingerHandle, abs(middle_desired_position));
-	}
-	if(ring_desired_position !=0){
-		osTimerStart(Ring_FingerHandle, abs(ring_desired_position));
-	}
-	if(pinky_desired_position !=0){
-		osTimerStart(Pinky_FingerHandle, abs(pinky_desired_position));
-	}
-
-//	osDelay(5000);
-//
-//	SignLetter('B');
-//
-//	if(thumb_desired_position !=0){
-//	ServoState state1 = {100,Direction_Decider(&thumb_desired_position),0,THUMB}; // Sets motion for Thumb
-//	osMessageQueuePut(servoQueueHandle, &state1, 0, 0);
-//	}
-//	if(index_desired_position !=0){
-//	ServoState state2 = {100,Direction_Decider(&index_desired_position),0,INDEX}; // Sets motion for Index Finger
-//	osMessageQueuePut(servoQueueHandle, &state2, 0, 0);
-//	}
-//	if(middle_desired_position !=0){
-//	ServoState state3 = {100,Direction_Decider(&middle_desired_position),0,MIDDLE}; // Sets motion for Middle Finger
-//	osMessageQueuePut(servoQueueHandle, &state3, 0, 0);
-//	}
-//	if(ring_desired_position !=0){
-//	ServoState state4 = {100,Direction_Decider(&ring_desired_position),0,RING}; // Sets motion for Ring Finger
-//	osMessageQueuePut(servoQueueHandle, &state4, 0, 0);
-//	}
-//	if(pinky_desired_position !=0){
-//	ServoState state5 = {100,Direction_Decider(&pinky_desired_position),0,PINKY}; // Sets motion for Pinky Finger0
-//	osMessageQueuePut(servoQueueHandle, &state5, 0, 0);
-//	}
-//
-//	if(index_desired_position !=0){
-//	osTimerStart(Index_FingerHandle, abs(index_desired_position));
-//	}
-//	if(thumb_desired_position !=0){
-//	osTimerStart(Thumb_FingerHandle, abs(thumb_desired_position));
-//	}
-//	if(middle_desired_position !=0){
-//	osTimerStart(Middle_FingerHandle, abs(middle_desired_position));
-//	}
-//	if(ring_desired_position !=0){
-//	osTimerStart(Ring_FingerHandle, abs(ring_desired_position));
-//	}
-//	if(pinky_desired_position !=0){
-//	osTimerStart(Pinky_FingerHandle, abs(pinky_desired_position));
-//	}
-	/* Infinite loop to keep it in the task */
   for(;;)
   {
-
-	if (IsButtonPressed())
-	  {
-		/* Process the message when button is pressed and message is available */
-
-		SignLetter('0');
-
-		if(thumb_desired_position < 0){
-			ServoState state1 = {100,Direction_Decider(&thumb_desired_position),0,THUMB}; // Sets motion for Thumb
-			osMessageQueuePut(servoQueueHandle, &state1, 0, 0);
-		}
-		else if(thumb_desired_position > 0){
-			thumb_desired_position = thumb_desired_position *.15;
-			ServoState state1 = {100,Direction_Decider(&thumb_desired_position),0,THUMB}; // Sets motion for Thumb
-			osMessageQueuePut(servoQueueHandle, &state1, 0, 0);
-		}
-
-
-		if(index_desired_position < 0){
-			ServoState state2 = {100,Direction_Decider(&index_desired_position),0,INDEX}; // Sets motion for Index Finger
-			osMessageQueuePut(servoQueueHandle, &state2, 0, 0);
-		}
-		else if(index_desired_position > 0){
-			index_desired_position = index_desired_position *0.50;
-			ServoState state2 = {100,Direction_Decider(&index_desired_position),0,INDEX}; // Sets motion for Index Finger
-			osMessageQueuePut(servoQueueHandle, &state2, 0, 0);
-		}
-
-
-		if(middle_desired_position < 0){
-			ServoState state3 = {100,Direction_Decider(&middle_desired_position),0,MIDDLE}; // Sets motion for Middle Finger
-			osMessageQueuePut(servoQueueHandle, &state3, 0, 0);
-		}
-		else if(middle_desired_position > 0){
-			middle_desired_position = middle_desired_position *0.45;
-			ServoState state3 = {100,Direction_Decider(&middle_desired_position),0,MIDDLE}; // Sets motion for Index Finger
-			osMessageQueuePut(servoQueueHandle, &state3, 0, 0);
-		}
-
-
-		if(ring_desired_position < 0){
-			ServoState state4 = {100,Direction_Decider(&ring_desired_position),0,RING}; // Sets motion for Ring Finger
-			osMessageQueuePut(servoQueueHandle, &state4, 0, 0);
-		}
-		else if(ring_desired_position > 0){
-			ring_desired_position = ring_desired_position *0.5;
-			ServoState state4 = {100,Direction_Decider(&ring_desired_position),0,RING}; // Sets motion for Index Finger
-			osMessageQueuePut(servoQueueHandle, &state4, 0, 0);
-		}
-
-
-		if(pinky_desired_position < 0){
-			ServoState state5 = {100,Direction_Decider(&pinky_desired_position),0,PINKY}; // Sets motion for Pinky Finger0
-			osMessageQueuePut(servoQueueHandle, &state5, 0, 0);
-		}
-		else if(pinky_desired_position > 0){
-			pinky_desired_position = pinky_desired_position *0.40;
-			ServoState state5 = {100,Direction_Decider(&pinky_desired_position),0,PINKY}; // Sets motion for Index Finger
-			osMessageQueuePut(servoQueueHandle, &state5, 0, 0);
-		}
-
-
-
-		if(index_desired_position !=0){
-			osTimerStart(Index_FingerHandle, abs(index_desired_position));
-		}
-		if(thumb_desired_position !=0){
-			osTimerStart(Thumb_FingerHandle, abs(thumb_desired_position));
-		}
-		if(middle_desired_position !=0){
-			osTimerStart(Middle_FingerHandle, abs(middle_desired_position));
-		}
-		if(ring_desired_position !=0){
-			osTimerStart(Ring_FingerHandle, abs(ring_desired_position));
-		}
-		if(pinky_desired_position !=0){
-			osTimerStart(Pinky_FingerHandle, abs(pinky_desired_position));
-		}
-
-
-//		ProcessReceivedMessage(message);
-//
-//		/* Reset message buffer */
-//		messageIndex = 0;
-//		messageReady = 0;
-//		memset(message, 0, sizeof(message));
-//
-//		/* Debounce */
-//		HAL_Delay(200);
-	  }
-	  osDelay(100);
+    osDelay(1);
   }
   /* USER CODE END 5 */
 }
@@ -1407,10 +1165,6 @@ void StartDefaultTask(void *argument)
 void Index(void *argument)
 {
   /* USER CODE BEGIN Index */
-
-	HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-	ServoState state1 = {0,STOP,0,INDEX}; // Stops Index Finger
-	osMessageQueuePut(servoQueueHandle, &state1, 0, 0);
 	HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
 	index_current = index_desired_position;
   /* USER CODE END Index */
@@ -1420,10 +1174,8 @@ void Index(void *argument)
 void Thumb(void *argument)
 {
   /* USER CODE BEGIN Thumb */
-	ServoState state1 = {0,STOP,0,THUMB}; // Stops Thumb Finger
-	osMessageQueuePut(servoQueueHandle, &state1, 0, 0);
 	HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
-    thumb_current = thumb_desired_position;
+	thumb_current = thumb_desired_position;
   /* USER CODE END Thumb */
 }
 
@@ -1431,10 +1183,7 @@ void Thumb(void *argument)
 void Middle(void *argument)
 {
   /* USER CODE BEGIN Middle */
-	ServoState state1 = {0,STOP,0,MIDDLE}; // Stops Middle Finger
-	osMessageQueuePut(servoQueueHandle, &state1, 0, 0);
 	HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_1);
-
 	middle_current = middle_desired_position;
   /* USER CODE END Middle */
 }
@@ -1443,8 +1192,6 @@ void Middle(void *argument)
 void Ring(void *argument)
 {
   /* USER CODE BEGIN Ring */
-	ServoState state1 = {0,STOP,0,RING}; // Stops Ring Finger
-	osMessageQueuePut(servoQueueHandle, &state1, 0, 0);
 	HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_1);
 	ring_current = ring_desired_position;
   /* USER CODE END Ring */
@@ -1454,8 +1201,6 @@ void Ring(void *argument)
 void Pinky(void *argument)
 {
   /* USER CODE BEGIN Pinky */
-	ServoState state1 = {0,STOP,0,PINKY}; // Stops Pinky Finger
-	osMessageQueuePut(servoQueueHandle, &state1, 0, 0);
 	HAL_TIM_PWM_Stop(&htim8, TIM_CHANNEL_1);
 	pinky_current = pinky_desired_position;
   /* USER CODE END Pinky */
