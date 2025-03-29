@@ -47,11 +47,11 @@
 #define SERVO_RING      TIM4, TIM_CHANNEL_1
 #define SERVO_PINKY     TIM8, TIM_CHANNEL_1
 
-#define THUMB_CLOSED 1000
-#define INDEX_CLOSED 1000
-#define MIDDLE_CLOSED 1000
-#define RING_CLOSED 1000
-#define PINKY_CLOSED 1000
+#define THUMB_CLOSED 2000
+#define INDEX_CLOSED 2000
+#define MIDDLE_CLOSED 2000
+#define RING_CLOSED 2000
+#define PINKY_CLOSED 2000
 
 typedef enum {
     THUMB = 0,
@@ -162,6 +162,7 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed);
 void Servo_StopAll(void);
 void SignLetter(char letter);
 int Direction_Decider(int* Desired_Position);
+void TimeVariation(void);
 
 static void MX_USART2_UART_Init(void);
 void ProcessReceivedMessage(char* msg);
@@ -1100,6 +1101,7 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 	            // Default position (rest)
 	            Servo_StopAll();
 	            break;
+
 	    }
 
 	    Servo_SetMotion(THUMB, Direction_Decider(&thumb_desired_position), 100);
@@ -1108,6 +1110,7 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 	    Servo_SetMotion(RING, Direction_Decider(&ring_desired_position), 100);
 	    Servo_SetMotion(PINKY, Direction_Decider(&pinky_desired_position), 100);
 
+	    TimeVariation();
 	    // Return to neutral position
 //	    Servo_StopAll();
 	}
@@ -1126,6 +1129,23 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 	    HAL_Delay(2000);
 	}
 
+	void TimeVariation(void){
+		if (thumb_desired_position == THUMB_CLOSED){
+			thumb_desired_position *= 0.5;
+		}
+		if (index_desired_position == INDEX_CLOSED){
+			index_desired_position *= 0.5;
+		}
+		if (middle_desired_position == MIDDLE_CLOSED){
+			middle_desired_position *= 0.5;
+		}
+		if (ring_desired_position == RING_CLOSED){
+			ring_desired_position *= 0.5;
+		}
+		if (pinky_desired_position == PINKY_CLOSED){
+			pinky_desired_position *= 0.5;
+		}
+	}
 
 	/**
 	 * @brief Initialize all servo timers and start PWM
@@ -1148,6 +1168,15 @@ void StartDefaultTask(void *argument)
 
 	SignLetter('A');
 
+	osTimerStart(Index_FingerHandle, abs(index_desired_position));
+	osTimerStart(Thumb_FingerHandle, abs(thumb_desired_position));
+	osTimerStart(Middle_FingerHandle, abs(middle_desired_position));
+	osTimerStart(Ring_FingerHandle, abs(ring_desired_position));
+	osTimerStart(Pinky_FingerHandle, abs(pinky_desired_position));
+
+	osDelay(5000);
+
+	SignLetter('B');
 	osTimerStart(Index_FingerHandle, abs(index_desired_position));
 	osTimerStart(Thumb_FingerHandle, abs(thumb_desired_position));
 	osTimerStart(Middle_FingerHandle, abs(middle_desired_position));
