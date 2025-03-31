@@ -46,19 +46,24 @@
 #define SERVO_MIDDLE    TIM3, TIM_CHANNEL_1
 #define SERVO_RING      TIM4, TIM_CHANNEL_1
 #define SERVO_PINKY     TIM8, TIM_CHANNEL_1
+#define SERVO_WRIST_BEND	TIM15, TIM_CHANNEL_1
+#define SERVO_WRIST_ROTATE	TIM17, TIM_CHANNEL_1
 
 #define THUMB_CLOSED 600		// Verified
 #define INDEX_CLOSED 1000		// Verified
 #define MIDDLE_CLOSED 1000		// Verified
 #define RING_CLOSED 1000		// Verified
 #define PINKY_CLOSED 900		//
+#define WRIST_CLOSED 500		//TBD idk how long it will take to get to 180.
 
 typedef enum {
     THUMB = 0,
     INDEX,
     MIDDLE,
     RING,
-    PINKY
+    PINKY,
+	WRIST_BEND,
+	WRIST_ROTATE
 } Finger;
 
 typedef enum {
@@ -87,6 +92,8 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
 TIM_HandleTypeDef htim8;
+TIM_HandleTypeDef htim15;
+TIM_HandleTypeDef htim17;
 
 UART_HandleTypeDef huart2;
 
@@ -96,13 +103,6 @@ const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityNormal,
-};
-/* Definitions for SupervisorTask */
-osThreadId_t SupervisorTaskHandle;
-const osThreadAttr_t SupervisorTask_attributes = {
-  .name = "SupervisorTask",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
 };
 /* Definitions for Index_Finger */
 osTimerId_t Index_FingerHandle;
@@ -129,6 +129,16 @@ osTimerId_t Pinky_FingerHandle;
 const osTimerAttr_t Pinky_Finger_attributes = {
   .name = "Pinky_Finger"
 };
+/* Definitions for Wrist_Bend */
+osTimerId_t Wrist_BendHandle;
+const osTimerAttr_t Wrist_Bend_attributes = {
+  .name = "Wrist_Bend"
+};
+/* Definitions for Wrist_Rotate */
+osTimerId_t Wrist_RotateHandle;
+const osTimerAttr_t Wrist_Rotate_attributes = {
+  .name = "Wrist_Rotate"
+};
 /* USER CODE BEGIN PV */
 char rxBuffer[1]; /* Buffer for receiving a single character */
 char message[256]; /* Buffer to store the complete message */
@@ -136,12 +146,14 @@ uint16_t messageIndex = 0;
 uint8_t messageReady = 0; /* Flag to indicate a message is in buffer waiting to be processed*/
 
 /* Global servo states */
-ServoState servoStates[5] = {
+ServoState servoStates[7] = {
     {0, STOP, SERVO_STOP},  // THUMB
     {0, STOP, SERVO_STOP},  // INDEX
     {0, STOP, SERVO_STOP},  // MIDDLE
     {0, STOP, SERVO_STOP},  // RING
-    {0, STOP, SERVO_STOP}   // PINKY
+    {0, STOP, SERVO_STOP},  // PINKY
+	{0, STOP, SERVO_STOP},  // WRIST_BEND
+	{0, STOP, SERVO_STOP}	// WRIST_ROTATE
 };
 
 /* USER CODE END PV */
@@ -155,13 +167,16 @@ static void MX_TIM3_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_TIM8_Init(void);
+static void MX_TIM15_Init(void);
+static void MX_TIM17_Init(void);
 void StartDefaultTask(void *argument);
-void StartSupervisorTask(void *argument);
 void Index(void *argument);
 void Thumb(void *argument);
 void Middle(void *argument);
 void Ring(void *argument);
 void Pinky(void *argument);
+void wrist_bend(void *argument);
+void wrist_rotate(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -181,24 +196,34 @@ volatile BaseType_t thumbDone = pdFALSE;
 volatile BaseType_t middleDone = pdFALSE;
 volatile BaseType_t ringDone = pdFALSE;
 volatile BaseType_t pinkyDone = pdFALSE;
+volatile BaseType_t wrist_BendDone = pdFALSE;
+volatile BaseType_t wrist_RotateDone = pdFALSE;
 
-int16_t thumb_current=0;
-int16_t index_current=0;
-int16_t middle_current=0;
-int16_t ring_current=0;
-int16_t pinky_current=0;
+int16_t thumb_current = 0;
+int16_t index_current = 0;
+int16_t middle_current = 0;
+int16_t ring_current = 0;
+int16_t pinky_current = 0;
+int16_t wrist_bend_current = 0;
+int16_t wrist_rotate_current = 0;
 
 int thumb_TravelTime = 0;
 int index_TravelTime = 0;
 int middle_TravelTime = 0;
 int ring_TravelTime = 0;
 int pinky_TravelTime = 0;
+int wrist_bend_TravelTime = 0;
+int wrist_rotate_TravelTime = 0;
 
 int thumb_desired_position;
 int index_desired_position;
 int middle_desired_position;
 int ring_desired_position;
 int pinky_desired_position;
+int wrist_bend_desired_position;
+int wrist_rotate_desired_position;
+
+
 //
 //int *ptr_thumb = &thumb_desired_position;
 //int *ptr_index = &index_desired_position;
@@ -249,6 +274,8 @@ int main(void)
   MX_TIM1_Init();
   MX_TIM4_Init();
   MX_TIM8_Init();
+  MX_TIM15_Init();
+  MX_TIM17_Init();
   /* USER CODE BEGIN 2 */
 
   // For testing:
@@ -289,6 +316,12 @@ int main(void)
   /* creation of Pinky_Finger */
   Pinky_FingerHandle = osTimerNew(Pinky, osTimerOnce, NULL, &Pinky_Finger_attributes);
 
+  /* creation of Wrist_Bend */
+  Wrist_BendHandle = osTimerNew(wrist_bend, osTimerOnce, NULL, &Wrist_Bend_attributes);
+
+  /* creation of Wrist_Rotate */
+  Wrist_RotateHandle = osTimerNew(wrist_rotate, osTimerPeriodic, NULL, &Wrist_Rotate_attributes);
+
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
@@ -300,9 +333,6 @@ int main(void)
   /* Create the thread(s) */
   /* creation of defaultTask */
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
-
-  /* creation of SupervisorTask */
-  SupervisorTaskHandle = osThreadNew(StartSupervisorTask, NULL, &SupervisorTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -679,6 +709,133 @@ static void MX_TIM8_Init(void)
 }
 
 /**
+  * @brief TIM15 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM15_Init(void)
+{
+
+  /* USER CODE BEGIN TIM15_Init 0 */
+
+  /* USER CODE END TIM15_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+  TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = {0};
+
+  /* USER CODE BEGIN TIM15_Init 1 */
+
+  /* USER CODE END TIM15_Init 1 */
+  htim15.Instance = TIM15;
+  htim15.Init.Prescaler = 79;
+  htim15.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim15.Init.Period = 19999;
+  htim15.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim15.Init.RepetitionCounter = 0;
+  htim15.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_PWM_Init(&htim15) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim15, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
+  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
+  if (HAL_TIM_PWM_ConfigChannel(&htim15, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
+  sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
+  sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
+  sBreakDeadTimeConfig.DeadTime = 0;
+  sBreakDeadTimeConfig.BreakState = TIM_BREAK_DISABLE;
+  sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
+  sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
+  if (HAL_TIMEx_ConfigBreakDeadTime(&htim15, &sBreakDeadTimeConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM15_Init 2 */
+
+  /* USER CODE END TIM15_Init 2 */
+  HAL_TIM_MspPostInit(&htim15);
+
+}
+
+/**
+  * @brief TIM17 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM17_Init(void)
+{
+
+  /* USER CODE BEGIN TIM17_Init 0 */
+
+  /* USER CODE END TIM17_Init 0 */
+
+  TIM_OC_InitTypeDef sConfigOC = {0};
+  TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = {0};
+
+  /* USER CODE BEGIN TIM17_Init 1 */
+
+  /* USER CODE END TIM17_Init 1 */
+  htim17.Instance = TIM17;
+  htim17.Init.Prescaler = 0;
+  htim17.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim17.Init.Period = 65535;
+  htim17.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim17.Init.RepetitionCounter = 0;
+  htim17.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim17) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim17) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
+  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
+  if (HAL_TIM_PWM_ConfigChannel(&htim17, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
+  sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
+  sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
+  sBreakDeadTimeConfig.DeadTime = 0;
+  sBreakDeadTimeConfig.BreakState = TIM_BREAK_DISABLE;
+  sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
+  sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
+  if (HAL_TIMEx_ConfigBreakDeadTime(&htim17, &sBreakDeadTimeConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM17_Init 2 */
+
+  /* USER CODE END TIM17_Init 2 */
+  HAL_TIM_MspPostInit(&htim17);
+
+}
+
+/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -869,6 +1026,12 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
         case PINKY:
             __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_1, pulse);
             break;
+        case WRIST_BEND:
+        	__HAL_TIM_SET_COMPARE(&htim15, TIM_CHANNEL_1, pulse);
+        	break;
+        case WRIST_ROTATE:
+        	__HAL_TIM_SET_COMPARE(&htim17, TIM_CHANNEL_1, pulse);
+        	break;
     	}
 	}
 
@@ -883,12 +1046,16 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 		Servo_SetMotion(MIDDLE, STOP, 0);
 		Servo_SetMotion(RING, STOP, 0);
 		Servo_SetMotion(PINKY, STOP, 0);
+		Servo_SetMotion(WRIST_BEND, STOP, 0);
+		Servo_SetMotion(WRIST_ROTATE, STOP, 0);
 
 	    HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
 	    HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
 	    HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_1);
 	    HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_1);
 	    HAL_TIM_PWM_Stop(&htim8, TIM_CHANNEL_1);
+	    HAL_TIM_PWM_Stop(&htim15, TIM_CHANNEL_1);
+	    HAL_TIM_PWM_Stop(&htim17, TIM_CHANNEL_1);
 	}
 
 	/**
@@ -913,6 +1080,13 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 	    if(pinky_TravelTime != 0){
 	    HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_1);
 	    }
+	    if(wrist_bend_TravelTime != 0){
+	    HAL_TIM_PWM_Start(&htim15, TIM_CHANNEL_1);
+	    }
+	    if(wrist_rotate_TravelTime != 0){
+		HAL_TIM_PWM_Start(&htim17, TIM_CHANNEL_1);
+		}
+
 //	    // Initialize all servos to stop position
 //	    Servo_StopAll();
 	}
@@ -950,6 +1124,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 1 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 		 case 'B':
@@ -958,6 +1134,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 0 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 0 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 0 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 		case 'C':
@@ -966,6 +1144,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 0.5 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 0.5 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 0.5 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 		case 'D':
@@ -974,6 +1154,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 0.75 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 0.75 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 0.75 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 
 		case 'E':
 			thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
@@ -981,6 +1163,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 0.75 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 0.75 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 0.75 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 		case 'F':
@@ -989,6 +1173,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 0 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 0 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 0 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 		case 'G':
@@ -997,6 +1183,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 1 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 		case 'H':
@@ -1005,6 +1193,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 0 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 1 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 		case 'I':
@@ -1013,6 +1203,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 1 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 0 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 		case 'J':
@@ -1021,6 +1213,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 1 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 0 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 		case 'K':
@@ -1029,6 +1223,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 0 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 1 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 		case 'L':
@@ -1037,6 +1233,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 1 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 		case 'M':
@@ -1045,6 +1243,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 0.9 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 0.9 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 		case 'N':
@@ -1053,6 +1253,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 0.9 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 1 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 		case 'O':
@@ -1061,6 +1263,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 0.5 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 0.5 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 0.5 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 		case 'P':
@@ -1069,6 +1273,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 0.5 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 1 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 		case 'Q':
@@ -1077,6 +1283,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 1 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 		case 'R':
@@ -1085,6 +1293,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 1 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 		case 'S':
@@ -1093,6 +1303,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 1 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 		case 'T':
@@ -1101,6 +1313,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 1 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 		case 'U':
@@ -1109,6 +1323,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 0 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 1 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 		case 'V':
@@ -1117,6 +1333,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 0 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 1 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 		case 'W':
@@ -1125,6 +1343,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 0 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 0 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 		case 'X':
@@ -1133,6 +1353,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 0.75 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 0.9 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 0.9 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 		case 'Y':
@@ -1141,6 +1363,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 1 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 0 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 		case 'Z':
@@ -1149,6 +1373,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 1 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 		case '0':
@@ -1157,6 +1383,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			middle_desired_position = middle_current - 0 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 0 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 0 * PINKY_CLOSED;
+			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
 	        default:
@@ -1256,6 +1484,32 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 						default:
 							return desired_position;
 					}
+					case(WRIST_BEND):
+						switch(desired_position){
+							case WRIST_CLOSED:
+								desired_position *= 0.3;
+								return desired_position;
+
+							case WRIST_CLOSED/2:
+								desired_position *= 0.15;
+								return desired_position;
+
+							default:
+								return desired_position;
+						}
+						case(WRIST_ROTATE):
+							switch(desired_position){
+								case WRIST_CLOSED:
+									desired_position *= 0.3;
+									return desired_position;
+
+								case WRIST_CLOSED/2:
+									desired_position *= 0.15;
+									return desired_position;
+
+								default:
+									return desired_position;
+							}
 		}
 	}
 
@@ -1285,6 +1539,8 @@ void StartDefaultTask(void *argument)
     middle_TravelTime = TimeVariation(MIDDLE, middle_desired_position);
     ring_TravelTime = TimeVariation(RING, ring_desired_position);
     pinky_TravelTime = TimeVariation(PINKY, pinky_desired_position);
+    wrist_bend_TravelTime = TimeVariation(WRIST_BEND, wrist_bend_desired_position);
+    wrist_rotate_TravelTime = TimeVariation(WRIST_ROTATE, wrist_rotate_desired_position);
 
 //    osDelay(100);
 //    Servo_Init();
@@ -1342,12 +1598,34 @@ void StartDefaultTask(void *argument)
     	pinkyDone = pdTRUE;
     }
 
+	if(wrist_bend_TravelTime != 0){
+//		HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+	  Servo_SetMotion(WRIST_BEND, Direction_Decider(&wrist_bend_desired_position), 100);
+		osTimerStart(Wrist_BendHandle, wrist_bend_TravelTime);
+	}
+    else if(thumb_TravelTime == 0){
+    	thumbDone = pdTRUE;
+    }
+
+	osDelay(50);
+
+	if(wrist_rotate_TravelTime != 0){
+//		HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+	  Servo_SetMotion(WRIST_ROTATE, Direction_Decider(&wrist_rotate_desired_position), 100);
+		osTimerStart(Wrist_RotateHandle, wrist_rotate_TravelTime);
+	}
+    else if(thumb_TravelTime == 0){
+    	thumbDone = pdTRUE;
+    }
+
+	osDelay(50);
+
 	HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
   for(;;)
   {
 
 	  // Checks if all timers have completed, and then deletes main task if it has
-	  if(indexDone && thumbDone && middleDone && ringDone && pinkyDone){
+	  if(indexDone && thumbDone && middleDone && ringDone && pinkyDone && wrist_BendDone && wrist_RotateDone){
 		  osDelay(1000);
 		  vTaskDelete(NULL);
 	  }
@@ -1355,48 +1633,6 @@ void StartDefaultTask(void *argument)
 	  osDelay(1);
   }
   /* USER CODE END 5 */
-}
-
-/* USER CODE BEGIN Header_StartSupervisorTask */
-/**
-* @This function checks that the default task has finished, and then restarts the default task if it has been.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartSupervisorTask */
-void StartSupervisorTask(void *argument)
-{
-  /* USER CODE BEGIN StartSupervisorTask */
-  /* Infinite loop */
-
-
-  for(;;)
-  {
-	if (defaultTaskHandle != NULL && eTaskGetState(defaultTaskHandle) == eDeleted){
-		defaultTaskHandle = NULL; //Clear Handle
-
-		// Stops all servos
-//		Servo_StopAll();
-
-		// Recreate the default task
-		defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
-
-		// Reset timer flags
-		indexDone = pdFALSE;
-		thumbDone = pdFALSE;
-		middleDone = pdFALSE;
-		ringDone = pdFALSE;
-		pinkyDone = pdFALSE;
-
-		// Test portion. Resets all fingers to open position
-//		HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-		osDelay(1000);
-		SignLetter('0');
-		osDelay(1000);
-	}
-    vTaskDelay(10);
-  }
-  /* USER CODE END StartSupervisorTask */
 }
 
 /* Index function */
@@ -1458,6 +1694,26 @@ void Pinky(void *argument)
 	pinkyDone = pdTRUE;
 	pinky_current = pinky_desired_position;
   /* USER CODE END Pinky */
+}
+
+/* wrist_bend function */
+void wrist_bend(void *argument)
+{
+  /* USER CODE BEGIN wrist_bend */
+		HAL_TIM_PWM_Stop(&htim15, TIM_CHANNEL_1);
+		wrist_BendDone = pdTRUE;
+		wrist_bend_current = wrist_bend_desired_position;
+  /* USER CODE END wrist_bend */
+}
+
+/* wrist_rotate function */
+void wrist_rotate(void *argument)
+{
+  /* USER CODE BEGIN wrist_rotate */
+	HAL_TIM_PWM_Stop(&htim17, TIM_CHANNEL_1);
+	wrist_RotateDone = pdTRUE;
+	wrist_rotate_current = wrist_rotate_desired_position;
+  /* USER CODE END wrist_rotate */
 }
 
 /**
