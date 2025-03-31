@@ -49,10 +49,10 @@
 #define SERVO_WRIST_BEND	TIM15, TIM_CHANNEL_1
 #define SERVO_WRIST_ROTATE	TIM17, TIM_CHANNEL_1
 
-#define THUMB_CLOSED 600		// Verified
-#define INDEX_CLOSED 1000		// Verified
-#define MIDDLE_CLOSED 1000		// Verified
-#define RING_CLOSED 1000		// Verified
+#define THUMB_CLOSED 1000		// Verified
+#define INDEX_CLOSED 1400		// Verified
+#define MIDDLE_CLOSED 1500		// Verified
+#define RING_CLOSED 1300		// Verified
 #define PINKY_CLOSED 900		//
 #define WRIST_CLOSED 500		//TBD idk how long it will take to get to 180.
 
@@ -184,7 +184,7 @@ void Servo_Init(void);
 void Servo_SetMotion(Finger finger, Direction direction, int speed);
 void Servo_StopAll(void);
 void SignLetter(char letter);
-int Direction_Decider(int* Desired_Position);
+int Direction_Decider(int Desired_Position);
 int TimeVariation(Finger finger, int desired_position);
 
 static void MX_USART2_UART_Init(void);
@@ -199,13 +199,18 @@ volatile BaseType_t pinkyDone = pdFALSE;
 volatile BaseType_t wrist_BendDone = pdFALSE;
 volatile BaseType_t wrist_RotateDone = pdFALSE;
 
-int16_t thumb_current = 0;
-int16_t index_current = 0;
-int16_t middle_current = 0;
-int16_t ring_current = 0;
-int16_t pinky_current = 0;
-int16_t wrist_bend_current = 0;
-int16_t wrist_rotate_current = 0;
+volatile BaseType_t default_init = pdTRUE;
+
+int thumb_current = 0;
+int index_current = 0;
+int middle_current = 0;
+int ring_current = 0;
+int pinky_current = 0;
+int wrist_bend_current = 0;
+int wrist_rotate_current = 0;
+
+//debugging counter for subsequent letter signing
+int16_t counter = 0;
 
 int thumb_TravelTime = 0;
 int index_TravelTime = 0;
@@ -215,13 +220,13 @@ int pinky_TravelTime = 0;
 int wrist_bend_TravelTime = 0;
 int wrist_rotate_TravelTime = 0;
 
-int thumb_desired_position;
-int index_desired_position;
-int middle_desired_position;
-int ring_desired_position;
-int pinky_desired_position;
-int wrist_bend_desired_position;
-int wrist_rotate_desired_position;
+int thumb_desired_position = 0;
+int index_desired_position = 0;
+int middle_desired_position = 0;
+int ring_desired_position = 0;
+int pinky_desired_position = 0;
+int wrist_bend_desired_position = 0;
+int wrist_rotate_desired_position = 0;
 
 
 //
@@ -285,7 +290,7 @@ int main(void)
 //	ring_desired_position = 0;
 //	pinky_desired_position = 900;
 
-  SignLetter('A');
+//  SignLetter('A');
 
   /* USER CODE END 2 */
 
@@ -320,7 +325,7 @@ int main(void)
   Wrist_BendHandle = osTimerNew(wrist_bend, osTimerOnce, NULL, &Wrist_Bend_attributes);
 
   /* creation of Wrist_Rotate */
-  Wrist_RotateHandle = osTimerNew(wrist_rotate, osTimerPeriodic, NULL, &Wrist_Rotate_attributes);
+  Wrist_RotateHandle = osTimerNew(wrist_rotate, osTimerOnce, NULL, &Wrist_Rotate_attributes);
 
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
@@ -1091,12 +1096,12 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 //	    Servo_StopAll();
 	}
 
-	int Direction_Decider(int* Desired_Position){
-		if(*Desired_Position < 0){
-			*Desired_Position = *Desired_Position * -1;
+	int Direction_Decider(int Desired_Position){
+		if(Desired_Position < 0){
+//			*Desired_Position = *Desired_Position * -1;
 			return CLOCKWISE;
 		}
-		else if(*Desired_Position > 0){
+		else if(Desired_Position > 0){
 			return COUNTERCLOCKWISE;
 		}
 		else{
@@ -1151,9 +1156,9 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 		case 'D':
 			thumb_desired_position = thumb_current - 0.5 * THUMB_CLOSED;
 			index_desired_position = index_current - 0 * INDEX_CLOSED;
-			middle_desired_position = middle_current - 0.75 * MIDDLE_CLOSED;
-			ring_desired_position = ring_current - 0.75 * RING_CLOSED;
-			pinky_desired_position = pinky_current - 0.75 * PINKY_CLOSED;
+			middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+			ring_desired_position = ring_current - 1 * RING_CLOSED;
+			pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
 			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
 			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 
@@ -1435,11 +1440,11 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			case(INDEX):
 				switch(desired_position){
 					case INDEX_CLOSED:
-						desired_position *= 0.5;
+						desired_position *= 0.6;
 						return desired_position;
 
 					case (INDEX_CLOSED/2):
-						desired_position *= 0.25;
+						desired_position *= 0.3;
 						return desired_position;
 
 					default:
@@ -1474,11 +1479,11 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 				case(PINKY):
 					switch(desired_position){
 						case PINKY_CLOSED:
-							desired_position *= 0.3;
+							desired_position *= 0.5;
 							return desired_position;
 
 						case PINKY_CLOSED/2:
-							desired_position *= 0.15;
+							desired_position *= 0.25;
 							return desired_position;
 
 						default:
@@ -1532,102 +1537,146 @@ void StartDefaultTask(void *argument)
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
 
-//	SignLetter('A');
-
-    thumb_TravelTime = TimeVariation(THUMB, thumb_desired_position);
-    index_TravelTime = TimeVariation(INDEX, index_desired_position);
-    middle_TravelTime = TimeVariation(MIDDLE, middle_desired_position);
-    ring_TravelTime = TimeVariation(RING, ring_desired_position);
-    pinky_TravelTime = TimeVariation(PINKY, pinky_desired_position);
-    wrist_bend_TravelTime = TimeVariation(WRIST_BEND, wrist_bend_desired_position);
-    wrist_rotate_TravelTime = TimeVariation(WRIST_ROTATE, wrist_rotate_desired_position);
-
-//    osDelay(100);
-//    Servo_Init();
-
-	if(thumb_TravelTime != 0){
-//		HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-	  Servo_SetMotion(THUMB, Direction_Decider(&thumb_desired_position), 100);
-		osTimerStart(Thumb_FingerHandle, thumb_TravelTime);
-	}
-    else if(thumb_TravelTime == 0){
-    	thumbDone = pdTRUE;
-    }
-
-	osDelay(50);
-
-	if(index_TravelTime != 0){
-//		HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
-	  Servo_SetMotion(INDEX, Direction_Decider(&index_desired_position), 100);
-		osTimerStart(Index_FingerHandle, index_TravelTime);
-	}
-    else if(index_TravelTime == 0){
-    	indexDone = pdTRUE;
-    }
-
-	osDelay(50);
-
-    if(middle_TravelTime != 0){
-//    	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
-		Servo_SetMotion(MIDDLE, Direction_Decider(&middle_desired_position), 100);
-		osTimerStart(Middle_FingerHandle, middle_TravelTime);
-	}
-    else if(middle_TravelTime == 0){
-    	middleDone = pdTRUE;
-    }
-
-	osDelay(50);
-
-	if(ring_TravelTime != 0){
-//		HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
-	  Servo_SetMotion(RING, Direction_Decider(&ring_desired_position), 100);
-		osTimerStart(Ring_FingerHandle, ring_TravelTime);
-	}
-    else if(ring_TravelTime == 0){
-    	ringDone = pdTRUE;
-    }
-
-	osDelay(50);
-
-	if(pinky_TravelTime != 0){
-//		HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_1);
-	    Servo_SetMotion(PINKY, Direction_Decider(&pinky_desired_position), 100);
-		osTimerStart(Pinky_FingerHandle, pinky_TravelTime);
-	}
-    else if(pinky_TravelTime == 0){
-    	pinkyDone = pdTRUE;
-    }
-
-	if(wrist_bend_TravelTime != 0){
-//		HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-	  Servo_SetMotion(WRIST_BEND, Direction_Decider(&wrist_bend_desired_position), 100);
-		osTimerStart(Wrist_BendHandle, wrist_bend_TravelTime);
-	}
-    else if(thumb_TravelTime == 0){
-    	thumbDone = pdTRUE;
-    }
-
-	osDelay(50);
-
-	if(wrist_rotate_TravelTime != 0){
-//		HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-	  Servo_SetMotion(WRIST_ROTATE, Direction_Decider(&wrist_rotate_desired_position), 100);
-		osTimerStart(Wrist_RotateHandle, wrist_rotate_TravelTime);
-	}
-    else if(thumb_TravelTime == 0){
-    	thumbDone = pdTRUE;
-    }
-
-	osDelay(50);
-
-	HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+//  SignLetter('0');
+//	int counter = 0;
   for(;;)
   {
+	  if(default_init){
+//			SignLetter('A');
 
-	  // Checks if all timers have completed, and then deletes main task if it has
+			thumb_TravelTime = TimeVariation(THUMB, thumb_desired_position);
+			index_TravelTime = TimeVariation(INDEX, index_desired_position);
+			middle_TravelTime = TimeVariation(MIDDLE, middle_desired_position);
+			ring_TravelTime = TimeVariation(RING, ring_desired_position);
+			pinky_TravelTime = TimeVariation(PINKY, pinky_desired_position);
+			wrist_bend_TravelTime = TimeVariation(WRIST_BEND, wrist_bend_desired_position);
+			wrist_rotate_TravelTime = TimeVariation(WRIST_ROTATE, wrist_rotate_desired_position);
+
+
+		//    osDelay(100);
+		//    Servo_Init();
+
+			if(thumb_TravelTime != 0){
+				HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+				Servo_SetMotion(THUMB, Direction_Decider(thumb_desired_position), 100);
+				osTimerStart(Thumb_FingerHandle, thumb_TravelTime);
+			}
+			else if(thumb_TravelTime == 0){
+				thumbDone = pdTRUE;
+			}
+
+//			osDelay(50);
+
+			if(index_TravelTime != 0){
+				HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+				Servo_SetMotion(INDEX, Direction_Decider(index_desired_position), 100);
+				osTimerStart(Index_FingerHandle, index_TravelTime);
+			}
+			else if(index_TravelTime == 0){
+				indexDone = pdTRUE;
+			}
+
+//			osDelay(50);
+
+			if(middle_TravelTime != 0){
+				HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+				Servo_SetMotion(MIDDLE, Direction_Decider(middle_desired_position), 100);
+				osTimerStart(Middle_FingerHandle, middle_TravelTime);
+			}
+			else if(middle_TravelTime == 0){
+				middleDone = pdTRUE;
+			}
+
+//			osDelay(50);
+
+			if(ring_TravelTime != 0){
+				HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
+			  Servo_SetMotion(RING, Direction_Decider(ring_desired_position), 100);
+				osTimerStart(Ring_FingerHandle, ring_TravelTime);
+			}
+			else if(ring_TravelTime == 0){
+				ringDone = pdTRUE;
+			}
+
+//			osDelay(50);
+
+			if(pinky_TravelTime != 0){
+				HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_1);
+				Servo_SetMotion(PINKY, Direction_Decider(pinky_desired_position), 100);
+				osTimerStart(Pinky_FingerHandle, pinky_TravelTime);
+			}
+			else if(pinky_TravelTime == 0){
+				pinkyDone = pdTRUE;
+			}
+
+			if(wrist_bend_TravelTime != 0){
+		//		HAL_TIM_PWM_Start(&htim15, TIM_CHANNEL_1);
+				Servo_SetMotion(WRIST_BEND, Direction_Decider(wrist_bend_desired_position), 100);
+				osTimerStart(Wrist_BendHandle, wrist_bend_TravelTime);
+			}
+			else if(wrist_bend_TravelTime == 0){
+				wrist_BendDone = pdTRUE;
+			}
+
+//			osDelay(50);
+
+			if(wrist_rotate_TravelTime != 0){
+		//		HAL_TIM_PWM_Start(&htim17, TIM_CHANNEL_1);
+				Servo_SetMotion(WRIST_ROTATE, Direction_Decider(wrist_rotate_desired_position), 100);
+				osTimerStart(Wrist_RotateHandle, wrist_rotate_TravelTime);
+			}
+			else if(wrist_rotate_TravelTime == 0){
+				wrist_RotateDone = pdTRUE;
+			}
+
+//			osDelay(50);
+
+			HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+			default_init = pdFALSE;
+	  }
+	  // Checks if all timers have completed
 	  if(indexDone && thumbDone && middleDone && ringDone && pinkyDone && wrist_BendDone && wrist_RotateDone){
 		  osDelay(1000);
-		  vTaskDelete(NULL);
+		  indexDone = pdFALSE;
+		  thumbDone = pdFALSE;
+		  middleDone = pdFALSE;
+		  ringDone = pdFALSE;
+		  pinkyDone = pdFALSE;
+		  wrist_BendDone = pdFALSE;
+		  wrist_RotateDone = pdFALSE;
+
+		  index_current = abs(index_desired_position);
+			thumb_current = abs(thumb_desired_position);
+			middle_current = abs(middle_desired_position);
+			ring_current = abs(ring_desired_position);
+			pinky_current = abs(pinky_desired_position);
+
+		  switch(counter){
+		  case 0:
+			  default_init = pdTRUE;
+			  SignLetter('0');
+			  osDelay(50);
+			  break;
+//			  counter++;
+		  case 1:
+			  default_init = pdTRUE;
+			  SignLetter('A');
+			  osDelay(50);
+			  break;
+//			  counter++;
+		  case 2:
+			  default_init = pdTRUE;
+			  SignLetter('0');
+			  break;
+//			  counter++;
+//		  case 3:
+//			  default_init = pdTRUE;
+//			  SignLetter('C');
+//		  case 4:
+//			  default_init = pdTRUE;
+//			  SignLetter('0');
+		  }
+			  counter += 1;
 	  }
 
 	  osDelay(1);
@@ -1643,7 +1692,6 @@ void Index(void *argument)
 	HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
 //	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 1500);
 	indexDone = pdTRUE;
-	index_current = index_desired_position;
   /* USER CODE END Index */
 }
 
@@ -1651,12 +1699,11 @@ void Index(void *argument)
 void Thumb(void *argument)
 {
   /* USER CODE BEGIN Thumb */
-	HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+//	HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
 //	Servo_SetMotion(THUMB, STOP, 0);
 	HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
 //	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 1500);
 	thumbDone = pdTRUE;
-	thumb_current = thumb_desired_position;
   /* USER CODE END Thumb */
 }
 
@@ -1668,7 +1715,6 @@ void Middle(void *argument)
 	HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_1);
 //	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 1500);
 	middleDone = pdTRUE;
-	middle_current = middle_desired_position;
   /* USER CODE END Middle */
 }
 
@@ -1680,7 +1726,6 @@ void Ring(void *argument)
 	HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_1);
 //	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 1500);
 	ringDone = pdTRUE;
-	ring_current = ring_desired_position;
   /* USER CODE END Ring */
 }
 
@@ -1692,7 +1737,6 @@ void Pinky(void *argument)
 	HAL_TIM_PWM_Stop(&htim8, TIM_CHANNEL_1);
 //	__HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_1, 1500);
 	pinkyDone = pdTRUE;
-	pinky_current = pinky_desired_position;
   /* USER CODE END Pinky */
 }
 
