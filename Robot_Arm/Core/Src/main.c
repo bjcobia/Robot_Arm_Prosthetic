@@ -54,7 +54,7 @@
 #define MIDDLE_CLOSED 1500		// Verified
 #define RING_CLOSED 1300		// Verified
 #define PINKY_CLOSED 900		//
-#define WRIST_CLOSED 500		//TBD idk how long it will take to get to 180.
+#define WRIST_CLOSED 2000		//TBD idk how long it will take to get to 180.
 
 typedef enum {
     THUMB = 0,
@@ -1115,12 +1115,9 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 	 * @param duration: How long to hold the position (in ms)
 	 * @retval None
 	 */
-	void SignLetter(char letter) {
+void SignLetter(char letter) {
 	    // Reset to neutral position
 //	    Servo_Init
-
-
-
 	    // Set finger positions based on the letter
 	    switch(letter) {
 		 case 'A':
@@ -1144,7 +1141,7 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			break;
 
 		case 'C':
-			thumb_desired_position = thumb_current - 0.25 * THUMB_CLOSED;
+			thumb_desired_position = thumb_current - 0.5 * THUMB_CLOSED; // changed to 0.5 for now. Was 0.25
 			index_desired_position = index_current - 0.5 * INDEX_CLOSED;
 			middle_desired_position = middle_current - 0.5 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 0.5 * RING_CLOSED;
@@ -1161,6 +1158,7 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
 			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
 			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
+			break;
 
 		case 'E':
 			thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
@@ -1244,9 +1242,9 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 
 		case 'M':
 			thumb_desired_position = thumb_current - 1 * THUMB_CLOSED; //Make speed faster so thumb closes first or the speed of the other 4 fingers slower.
-			index_desired_position = index_current - 0.9 * INDEX_CLOSED;
-			middle_desired_position = middle_current - 0.9 * MIDDLE_CLOSED;
-			ring_desired_position = ring_current - 0.9 * RING_CLOSED;
+			index_desired_position = index_current - 0.75 * INDEX_CLOSED;
+			middle_desired_position = middle_current - 0.75 * MIDDLE_CLOSED;
+			ring_desired_position = ring_current - 0.75 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
 			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
 			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
@@ -1254,8 +1252,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 
 		case 'N':
 			thumb_desired_position = thumb_current - 1 * THUMB_CLOSED; //Also change the speeds on this one
-			index_desired_position = index_current - 0.9 * INDEX_CLOSED;
-			middle_desired_position = middle_current - 0.9 * MIDDLE_CLOSED;
+			index_desired_position = index_current - 0.75 * INDEX_CLOSED;
+			middle_desired_position = middle_current - 0.75 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 1 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
 			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
@@ -1283,8 +1281,8 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			break;
 
 		case 'Q':
-			thumb_desired_position = thumb_current - 0.1 * THUMB_CLOSED;
-			index_desired_position = index_current - 0.3 * INDEX_CLOSED;
+			thumb_desired_position = thumb_current - 0.5 * THUMB_CLOSED;
+			index_desired_position = index_current - 0.5 * INDEX_CLOSED;
 			middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 1 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
@@ -1303,7 +1301,7 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			break;
 
 		case 'S':
-			thumb_desired_position = thumb_current - 0.8 * THUMB_CLOSED;//Make thumb slower so it ends on top of the other fingers
+			thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;//Make thumb slower so it ends on top of the other fingers
 			index_desired_position = index_current - 1 * INDEX_CLOSED;
 			middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 1 * RING_CLOSED;
@@ -1314,7 +1312,7 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 
 		case 'T':
 			thumb_desired_position = thumb_current - 1 * THUMB_CLOSED; //TBD
-			index_desired_position = index_current - 1 * INDEX_CLOSED;
+			index_desired_position = index_current - 0.5 * INDEX_CLOSED;
 			middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 1 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
@@ -1353,11 +1351,11 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			break;
 
 		case 'X':
-			thumb_desired_position = thumb_current - 0.5 * THUMB_CLOSED;
-			index_desired_position = index_current - 0.25 * INDEX_CLOSED;
-			middle_desired_position = middle_current - 0.75 * MIDDLE_CLOSED;
-			ring_desired_position = ring_current - 0.9 * RING_CLOSED;
-			pinky_desired_position = pinky_current - 0.9 * PINKY_CLOSED;
+			thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
+			index_desired_position = index_current - 0.5 * INDEX_CLOSED;
+			middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
+			ring_desired_position = ring_current - 1 * RING_CLOSED;
+			pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
 			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
 			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
@@ -1374,7 +1372,7 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 
 		case 'Z':
 			thumb_desired_position = thumb_current - 1 * THUMB_CLOSED; //TDB
-			index_desired_position = index_current - 1 * INDEX_CLOSED;
+			index_desired_position = index_current - 0 * INDEX_CLOSED;
 			middle_desired_position = middle_current - 1 * MIDDLE_CLOSED;
 			ring_desired_position = ring_current - 1 * RING_CLOSED;
 			pinky_desired_position = pinky_current - 1 * PINKY_CLOSED;
@@ -1392,10 +1390,10 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
 
-	        default:
-	            // Default position (rest)
-	            Servo_StopAll();
-	            break;
+		default:
+			// Default position (rest)
+			Servo_StopAll();
+			break;
 
 	    }
 	}
@@ -1420,102 +1418,144 @@ void Servo_SetMotion(Finger finger, Direction direction, int speed) {
 		else if(desired_position == 0)
 			return 0;
 		// Actual time variation calculations based on testing
-		switch(finger){
-			case(THUMB):
-				switch(desired_position){
-					case THUMB_CLOSED:
-						desired_position *= 0.5;
-						return desired_position;
-
-					case THUMB_CLOSED/2:
-						desired_position *= 0.25;
-						return desired_position;
-
-					case (THUMB_CLOSED * 3 + 2) / 4:
-						desired_position *= 0.38;
-
-					default:
-						return desired_position;
-				}
-			case(INDEX):
-				switch(desired_position){
-					case INDEX_CLOSED:
-						desired_position *= 0.6;
-						return desired_position;
-
-					case (INDEX_CLOSED/2):
-						desired_position *= 0.3;
-						return desired_position;
-
-					default:
-						return desired_position;
-				}
-			case(MIDDLE):
-				switch(desired_position){
-					case MIDDLE_CLOSED:
-						desired_position *= 0.5;
-						return desired_position;
-
-					case MIDDLE_CLOSED/2:
-						desired_position *= 0.25;
-						return desired_position;
-
-					default:
-						return desired_position;
-				}
-			case(RING):
-				switch(desired_position){
-					case RING_CLOSED:
-						desired_position *= 0.6;
-						return desired_position;
-
-					case RING_CLOSED/2:
-						desired_position *= 0.25;
-						return desired_position;
-
-					default:
-						return desired_position;
-				}
-				case(PINKY):
-					switch(desired_position){
-						case PINKY_CLOSED:
-							desired_position *= 0.5;
-							return desired_position;
-
-						case PINKY_CLOSED/2:
-							desired_position *= 0.25;
-							return desired_position;
-
-						default:
-							return desired_position;
-					}
-					case(WRIST_BEND):
-						switch(desired_position){
-							case WRIST_CLOSED:
-								desired_position *= 0.3;
-								return desired_position;
-
-							case WRIST_CLOSED/2:
-								desired_position *= 0.15;
-								return desired_position;
-
-							default:
-								return desired_position;
-						}
-						case(WRIST_ROTATE):
-							switch(desired_position){
-								case WRIST_CLOSED:
-									desired_position *= 0.3;
-									return desired_position;
-
-								case WRIST_CLOSED/2:
-									desired_position *= 0.15;
-									return desired_position;
-
-								default:
-									return desired_position;
-							}
-		}
+		return desired_position *= 0.5;
+//		switch(finger){
+//			case(THUMB):
+//				switch(desired_position){
+//					case THUMB_CLOSED:
+//						desired_position *= 0.5;
+//						return desired_position;
+//						break;
+//					case THUMB_CLOSED/2:
+//						desired_position *= 0.25;
+//						return desired_position;
+//						break;
+//					case (THUMB_CLOSED * 3 + 2) / 4:
+//						desired_position *= 0.38;
+//						break;
+//					case (THUMB_CLOSED/4):
+//						desired_position *= 0.15;
+//						break;
+//					default:
+//						return desired_position;
+//						break;
+//				}
+//				break;
+//			case(INDEX):
+//				switch(desired_position){
+//					case INDEX_CLOSED:
+//						desired_position *= 0.6;
+//						return desired_position;
+//						break;
+//					case (INDEX_CLOSED/2):
+//						desired_position *= 0.3;
+//						return desired_position;
+//						break;
+//					case (INDEX_CLOSED * 3+2)/4:
+//						desired_position *= 0.45;
+//						break;
+//					case (INDEX_CLOSED/4):
+//						desired_position *= 0.15;
+//						break;
+//					default:
+//						return desired_position;
+//						break;
+//				}
+//				break;
+//			case(MIDDLE):
+//				switch(desired_position){
+//					case MIDDLE_CLOSED:
+//						desired_position *= 0.5;
+//						return desired_position;
+//						break;
+//					case MIDDLE_CLOSED/2:
+//						desired_position *= 0.25;
+//						return desired_position;
+//						break;
+//					case (MIDDLE_CLOSED*3+2)/4:
+//						desired_position *= 0.35;
+//						break;
+//					case (MIDDLE_CLOSED/4):
+//						desired_position *= 0.15;
+//						break;
+//					default:
+//						return desired_position;
+//						break;
+//				}
+//				break;
+//			case(RING):
+//				switch(desired_position){
+//					case RING_CLOSED:
+//						desired_position *= 0.6;
+//						return desired_position;
+//						break;
+//					case RING_CLOSED/2:
+//						desired_position *= 0.25;
+//						return desired_position;
+//						break;
+//					case (RING_CLOSED*3+2)/4:
+//						desired_position *= 0.4;
+//						break;
+//					case (RING_CLOSED/4):
+//						desired_position *= 0.15;
+//						break;
+//					default:
+//						return desired_position;
+//						break;
+//				}
+//				break;
+//				case(PINKY):
+//					switch(desired_position){
+//						case PINKY_CLOSED:
+//							desired_position *= 0.5;
+//							return desired_position;
+//							break;
+//						case PINKY_CLOSED/2:
+//							desired_position *= 0.25;
+//							return desired_position;
+//							break;
+//						case (PINKY_CLOSED*3+2)/4:
+//							desired_position *= 0.40;
+//							break;
+//						case (PINKY_CLOSED/4):
+//							desired_position *= 0.15;
+//							break;
+//						default:
+//							return desired_position;
+//							break;
+//					}
+//					break;
+//					case(WRIST_BEND):
+//						switch(desired_position){
+//							case WRIST_CLOSED:
+//								desired_position *= 0.3;
+//								return desired_position;
+//								break;
+//							case WRIST_CLOSED/2:
+//								desired_position *= 0.15;
+//								return desired_position;
+//								break;
+//							default:
+//								return desired_position;
+//								break;
+//						}
+//						break;
+//						case(WRIST_ROTATE):
+//							switch(desired_position){
+//								case WRIST_CLOSED:
+//									desired_position *= 0.3;
+//									return desired_position;
+//									break;
+//								case WRIST_CLOSED/2:
+//									desired_position *= 0.15;
+//									return desired_position;
+//									break;
+//								default:
+//									return desired_position;
+//									break;
+//							}
+//							break;
+//		}
 	}
 
 	/**
@@ -1636,7 +1676,7 @@ void StartDefaultTask(void *argument)
 	  }
 	  // Checks if all timers have completed
 	  if(indexDone && thumbDone && middleDone && ringDone && pinkyDone && wrist_BendDone && wrist_RotateDone){
-		  osDelay(1000);
+		  osDelay(2500);
 		  indexDone = pdFALSE;
 		  thumbDone = pdFALSE;
 		  middleDone = pdFALSE;
@@ -1651,30 +1691,36 @@ void StartDefaultTask(void *argument)
 			ring_current = abs(ring_desired_position);
 			pinky_current = abs(pinky_desired_position);
 
+
 		  switch(counter){
 		  case 0:
 			  default_init = pdTRUE;
-			  SignLetter('0');
+			  SignLetter('D');
 			  osDelay(50);
 			  break;
 //			  counter++;
 		  case 1:
 			  default_init = pdTRUE;
-			  SignLetter('A');
+			  SignLetter('O');
 			  osDelay(50);
 			  break;
 //			  counter++;
 		  case 2:
 			  default_init = pdTRUE;
-			  SignLetter('0');
+			  SignLetter('N');
+			  osDelay(50);
 			  break;
 //			  counter++;
-//		  case 3:
-//			  default_init = pdTRUE;
-//			  SignLetter('C');
+		  case 3:
+			  default_init = pdTRUE;
+			  SignLetter('E');
+			  osDelay(50);
+//			  break;
 //		  case 4:
 //			  default_init = pdTRUE;
 //			  SignLetter('0');
+//			  osDelay(50);
+//			  break;
 		  }
 			  counter += 1;
 	  }
