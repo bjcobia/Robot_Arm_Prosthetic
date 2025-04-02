@@ -1721,7 +1721,14 @@ void StartDefaultTask(void *argument)
 		  case 3:
 			  default_init = pdTRUE;
 //			  SignLetter(word[counter]);
-			  SignLetter('I');
+//			  SignLetter('I');
+				thumb_desired_position = 0;
+				index_desired_position = -1*INDEX_CLOSED;
+				middle_desired_position = -1* MIDDLE_CLOSED;
+				ring_desired_position = 0;
+				pinky_desired_position = PINKY_CLOSED;
+//				wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
+//				wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			  osDelay(25);
 			  break;
 //		  case 4:
@@ -1733,6 +1740,7 @@ void StartDefaultTask(void *argument)
 		  case 4:
 			  default_init = pdTRUE;
 			  SignLetter('0');
+			  ring_desired_position = RING_CLOSED;
 			  osDelay(25);
 			  break;
 //		  case 6:
