@@ -50,9 +50,9 @@
 #define SERVO_WRIST_ROTATE	TIM17, TIM_CHANNEL_1
 
 #define THUMB_CLOSED 1000		// Verified
-#define INDEX_CLOSED 1400		// Verified
+#define INDEX_CLOSED 1600		// Verified
 #define MIDDLE_CLOSED 1500		// Verified
-#define RING_CLOSED 1300		// Verified
+#define RING_CLOSED 1500		// Verified
 #define PINKY_CLOSED 900		//
 #define WRIST_CLOSED 2000		//TBD idk how long it will take to get to 180.
 
@@ -211,6 +211,8 @@ int wrist_rotate_current = 0;
 
 //debugging counter for subsequent letter signing
 int16_t counter = 0;
+char word[] = "HELLO";
+
 
 int thumb_TravelTime = 0;
 int index_TravelTime = 0;
@@ -1162,10 +1164,10 @@ void SignLetter(char letter) {
 
 		case 'E':
 			thumb_desired_position = thumb_current - 1 * THUMB_CLOSED;
-			index_desired_position = index_current - 0.75 * INDEX_CLOSED;
-			middle_desired_position = middle_current - 0.75 * MIDDLE_CLOSED;
-			ring_desired_position = ring_current - 0.75 * RING_CLOSED;
-			pinky_desired_position = pinky_current - 0.75 * PINKY_CLOSED;
+			index_desired_position = index_current - 0.5 * INDEX_CLOSED;
+			middle_desired_position = middle_current - 0.5 * MIDDLE_CLOSED;
+			ring_desired_position = ring_current - 0.5 * RING_CLOSED;
+			pinky_desired_position = pinky_current - 0.5 * PINKY_CLOSED;
 			wrist_bend_desired_position = wrist_bend_current - 1 * WRIST_CLOSED;
 			wrist_rotate_desired_position = wrist_rotate_current - 1 * WRIST_CLOSED;
 			break;
@@ -1418,7 +1420,9 @@ void SignLetter(char letter) {
 		else if(desired_position == 0)
 			return 0;
 		// Actual time variation calculations based on testing
+		else {
 		return desired_position *= 0.5;
+		}
 //		switch(finger){
 //			case(THUMB):
 //				switch(desired_position){
@@ -1605,7 +1609,7 @@ void StartDefaultTask(void *argument)
 				thumbDone = pdTRUE;
 			}
 
-//			osDelay(50);
+//			osDelay(10);
 
 			if(index_TravelTime != 0){
 				HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
@@ -1616,7 +1620,7 @@ void StartDefaultTask(void *argument)
 				indexDone = pdTRUE;
 			}
 
-//			osDelay(50);
+//			osDelay(10);
 
 			if(middle_TravelTime != 0){
 				HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
@@ -1627,18 +1631,18 @@ void StartDefaultTask(void *argument)
 				middleDone = pdTRUE;
 			}
 
-//			osDelay(50);
+//			osDelay(10);
 
 			if(ring_TravelTime != 0){
 				HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
-			  Servo_SetMotion(RING, Direction_Decider(ring_desired_position), 100);
+				Servo_SetMotion(RING, Direction_Decider(ring_desired_position), 100);
 				osTimerStart(Ring_FingerHandle, ring_TravelTime);
 			}
 			else if(ring_TravelTime == 0){
 				ringDone = pdTRUE;
 			}
 
-//			osDelay(50);
+//			osDelay(10);
 
 			if(pinky_TravelTime != 0){
 				HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_1);
@@ -1649,34 +1653,34 @@ void StartDefaultTask(void *argument)
 				pinkyDone = pdTRUE;
 			}
 
-			if(wrist_bend_TravelTime != 0){
-		//		HAL_TIM_PWM_Start(&htim15, TIM_CHANNEL_1);
-				Servo_SetMotion(WRIST_BEND, Direction_Decider(wrist_bend_desired_position), 100);
-				osTimerStart(Wrist_BendHandle, wrist_bend_TravelTime);
-			}
-			else if(wrist_bend_TravelTime == 0){
-				wrist_BendDone = pdTRUE;
-			}
+//			if(wrist_bend_TravelTime != 0){
+//		//		HAL_TIM_PWM_Start(&htim15, TIM_CHANNEL_1);
+//				Servo_SetMotion(WRIST_BEND, Direction_Decider(wrist_bend_desired_position), 100);
+//				osTimerStart(Wrist_BendHandle, wrist_bend_TravelTime);
+//			}
+//			else if(wrist_bend_TravelTime == 0){
+//				wrist_BendDone = pdTRUE;
+//			}
+//
+////			osDelay(10);
+//
+//			if(wrist_rotate_TravelTime != 0){
+//		//		HAL_TIM_PWM_Start(&htim17, TIM_CHANNEL_1);
+//				Servo_SetMotion(WRIST_ROTATE, Direction_Decider(wrist_rotate_desired_position), 100);
+//				osTimerStart(Wrist_RotateHandle, wrist_rotate_TravelTime);
+//			}
+//			else if(wrist_rotate_TravelTime == 0){
+//				wrist_RotateDone = pdTRUE;
+//			}
 
 //			osDelay(50);
 
-			if(wrist_rotate_TravelTime != 0){
-		//		HAL_TIM_PWM_Start(&htim17, TIM_CHANNEL_1);
-				Servo_SetMotion(WRIST_ROTATE, Direction_Decider(wrist_rotate_desired_position), 100);
-				osTimerStart(Wrist_RotateHandle, wrist_rotate_TravelTime);
-			}
-			else if(wrist_rotate_TravelTime == 0){
-				wrist_RotateDone = pdTRUE;
-			}
-
-//			osDelay(50);
-
-			HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+//			HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
 			default_init = pdFALSE;
 	  }
 	  // Checks if all timers have completed
-	  if(indexDone && thumbDone && middleDone && ringDone && pinkyDone && wrist_BendDone && wrist_RotateDone){
-		  osDelay(2500);
+	  if(indexDone && thumbDone && middleDone && ringDone && pinkyDone){
+		  osDelay(1000);
 		  indexDone = pdFALSE;
 		  thumbDone = pdFALSE;
 		  middleDone = pdFALSE;
@@ -1686,42 +1690,80 @@ void StartDefaultTask(void *argument)
 		  wrist_RotateDone = pdFALSE;
 
 		  index_current = abs(index_desired_position);
-			thumb_current = abs(thumb_desired_position);
-			middle_current = abs(middle_desired_position);
-			ring_current = abs(ring_desired_position);
-			pinky_current = abs(pinky_desired_position);
+		  thumb_current = abs(thumb_desired_position);
+		  middle_current = abs(middle_desired_position);
+		  ring_current = abs(ring_desired_position);
+		  pinky_current = abs(pinky_desired_position);
 
 
 		  switch(counter){
 		  case 0:
 			  default_init = pdTRUE;
-			  SignLetter('D');
-			  osDelay(50);
+//			  SignLetter(word[counter]);
+			  SignLetter('B');
+//			  pinky_desired_position = -1200;
+			  osDelay(25);
 			  break;
-//			  counter++;
 		  case 1:
 			  default_init = pdTRUE;
-			  SignLetter('O');
-			  osDelay(50);
+//			  pinky_desired_position = 0;
+//			  SignLetter(word[counter]);
+			  SignLetter('Y');
+			  osDelay(25);
 			  break;
-//			  counter++;
 		  case 2:
 			  default_init = pdTRUE;
-			  SignLetter('N');
-			  osDelay(50);
+//			  pinky_desired_position = 1200;
+//			  SignLetter(word[counter]);
+			  SignLetter('U');
+			  osDelay(25);
 			  break;
-//			  counter++;
 		  case 3:
 			  default_init = pdTRUE;
-			  SignLetter('E');
-			  osDelay(50);
-//			  break;
+//			  SignLetter(word[counter]);
+			  SignLetter('I');
+			  osDelay(25);
+			  break;
 //		  case 4:
 //			  default_init = pdTRUE;
-//			  SignLetter('0');
-//			  osDelay(50);
+////			  SignLetter(word[counter]);
+//			  SignLetter('O');
+//			  osDelay(25);
 //			  break;
+		  case 4:
+			  default_init = pdTRUE;
+			  SignLetter('0');
+			  osDelay(25);
+			  break;
+//		  case 6:
+//			  default_init = pdTRUE;
+//			  SignLetter(word[counter]);
+//			  osDelay(25);
+//			  break;
+//		  case 7:
+//			  default_init = pdTRUE;
+//			  SignLetter(word[counter]);
+//			  osDelay(25);
+//			  break;
+//		  case 8:
+//			  default_init = pdTRUE;
+//			  SignLetter(word[counter]);
+//			  osDelay(25);
+//			  break;
+//		  case 9:
+//			  default_init = pdTRUE;
+//			  SignLetter(word[counter]);
+//			  osDelay(25);
+//			  break;
+//		  case 10:
+//			  default_init = pdTRUE;
+//			  SignLetter('0');
+//			  osDelay(25);
+//			  break;
+		  default:
+			  break;
 		  }
+
 			  counter += 1;
 	  }
 
